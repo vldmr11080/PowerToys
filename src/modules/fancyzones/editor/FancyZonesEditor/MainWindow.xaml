@@ -20,6 +20,7 @@
     <Window.Resources>
         <Converters:BooleanToBrushConverter x:Key="BooleanToBrushConverter" />
         <Converters:ModelToVisibilityConverter x:Key="ModelToVisibilityConverter" />
+        <Converters:NewModelToVisibilityConverter x:Key="NewModelToVisibilityConverter" />
         <Converters:BooleanToIntConverter x:Key="BooleanToIntConverter" />
 
         <Style x:Key="titleText" TargetType="TextBlock">
@@ -68,7 +69,7 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="Black"/>
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Left" />
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="secondaryButton" TargetType="Button">
@@ -213,16 +214,16 @@
                                                HorizontalAlignment="Stretch" 
                                                LastChildFill="True">
                                         <DockPanel DockPanel.Dock="Top" LastChildFill="True" >
-                                            <Button x:Name="EditButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnEdit" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
-                                                <Image Source="images/Merge.png" />
-                                            </Button>
                                             <Button x:Name="ApplyButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnApply" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
-                                                <Image Source="images/Merge.png" />
+                                                <Image Source="images/Apply.png" />
                                             </Button>
-                                            <TextBlock DockPanel.Dock="Top" 
+                                            <Button x:Name="EditButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnEdit" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
+                                                <Image Source="images/Edit.png" />
+                                            </Button>
+                                            <TextBlock DockPanel.Dock="Top"
                                                        TextTrimming="CharacterEllipsis"
-                                                       Padding="8,0,8,0"
-                                                       Text="{Binding Name}" 
+                                                       Padding="16,0,8,0"
+                                                       Text="{Binding Name}"
                                                        Style="{StaticResource templateTitleText}" />
                                         </DockPanel>
                                         <local:LayoutPreview Margin="16" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
@@ -263,13 +264,20 @@
                                             <Button x:Name="DeleteButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnDelete" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
                                                 <Image Source="images/Delete.png" />
                                             </Button>
-                                            <Button x:Name="EditButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnEdit" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
-                                                <Image Source="images/Merge.png" />
-                                            </Button>
                                             <Button x:Name="ApplyButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnApply" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
-                                                <Image Source="images/Merge.png" />
+                                                <Image Source="images/Apply.png" />
+                                            </Button>
+                                            <Button x:Name="EditButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnEdit" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
+                                                <Image Source="images/Edit.png" />
+                                            </Button>
+                                            <Button x:Name="NewLayoutButton" Visibility="{Binding Converter={StaticResource NewModelToVisibilityConverter}}" Style="{StaticResource newLayoutButton}" DockPanel.Dock="Top" Click="CreateNewCustom">
+                                                <StackPanel>
+                                                    <TextBlock Text="Create new custom" Style="{StaticResource templateTitleText}"  />
+                                                    <TextBlock HorizontalAlignment="Center" Text="+"/>
+                                                </StackPanel>
                                             </Button>
                                             <TextBlock DockPanel.Dock="Top" 
+                                                       Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}"
                                                        TextTrimming="CharacterEllipsis"
                                                        Padding="8,0,8,0"
                                                        Text="{Binding Name}" 
