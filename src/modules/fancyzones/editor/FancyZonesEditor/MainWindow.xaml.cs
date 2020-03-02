@@ -85,13 +85,11 @@ namespace FancyZonesEditor
             EditorOverlay.Current.DataContext = newSelection;
         }
 
-        private void EditLayout_Click(object sender, RoutedEventArgs e)
+        private void EditLayout(object sender, RoutedEventArgs e)
         {
+            LayoutModel model = ((FrameworkElement)sender).DataContext as LayoutModel;
             EditorOverlay mainEditor = EditorOverlay.Current;
-            if (!(mainEditor.DataContext is LayoutModel model))
-            {
-                return;
-            }
+            mainEditor.DataContext = model;
 
             model.IsSelected = false;
             Hide();
@@ -143,24 +141,6 @@ namespace FancyZonesEditor
             window.Show();
         }
 
-        private void Apply_Click(object sender, RoutedEventArgs e)
-        {
-            EditorOverlay mainEditor = EditorOverlay.Current;
-            if (mainEditor.DataContext is LayoutModel model)
-            {
-                if (model is GridLayoutModel)
-                {
-                    model.Apply(mainEditor.GetZoneRects());
-                }
-                else
-                {
-                    model.Apply((model as CanvasLayoutModel).Zones.ToArray());
-                }
-
-                Close();
-            }
-        }
-
         private void OnClosing(object sender, EventArgs e)
         {
             LayoutModel.SerializeDeletedCustomZoneSets();
@@ -184,6 +164,11 @@ namespace FancyZonesEditor
             }
         }
 
+        private void CreateNewCustom(object sender, RoutedEventArgs e)
+        {
+            EditLayout(sender, e);
+        }
+
         private void OnDelete(object sender, RoutedEventArgs e)
         {
             LayoutModel model = ((FrameworkElement)sender).DataContext as LayoutModel;
@@ -193,6 +178,38 @@ namespace FancyZonesEditor
             }
 
             model.Delete();
+        }
+
+        private void OnEdit(object sender, RoutedEventArgs e)
+        {
+            EditLayout(sender, e);
+        }
+
+        private void OnApply(object sender, RoutedEventArgs e)
+        {
+            LayoutModel model = ((FrameworkElement)sender).DataContext as LayoutModel;
+            EditorOverlay mainEditor = EditorOverlay.Current;
+            mainEditor.DataContext = model;
+
+            if (model is GridLayoutModel)
+            {
+                model.Apply(mainEditor.GetZoneRects());
+            }
+            else
+            {
+                model.Apply((model as CanvasLayoutModel).Zones.ToArray());
+            }
+
+            Close();
+        }
+
+        private void SpacingValueChanged(object sender, TextChangedEventArgs e)
+        {
+            // Handle updates of spacing value in real time.
+            if (int.TryParse(((TextBox)sender).Text, out int spacing))
+            {
+                _settings.Spacing = spacing;
+            }
         }
     }
 }
