@@ -72,6 +72,7 @@
     <Compile Include="CanvasEditor.xaml.cs">
       <DependentUpon>CanvasEditor.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Converters\NewModelToVisibilityConverter.xaml.cs" />
     <Compile Include="EditorWindow.cs" />
     <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="GridEditor.xaml.cs">
@@ -210,6 +211,12 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="images\Merge.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="images\Edit.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="images\Apply.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
