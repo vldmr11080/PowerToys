@@ -177,7 +177,13 @@ namespace FancyZonesEditor
                 SetSelectedItem();
             }
 
-            model.Delete();
+            string msgBoxName = "Delete Confirmation";
+            string msgBoxText = "Delete \"" + model.Name + "\" custom layout?";
+            MessageBoxResult confirmation = MessageBox.Show(msgBoxText, msgBoxName, MessageBoxButton.YesNo);
+            if (confirmation == MessageBoxResult.Yes)
+            {
+                model.Delete();
+            }
         }
 
         private void OnEdit(object sender, RoutedEventArgs e)
