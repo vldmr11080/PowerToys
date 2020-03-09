@@ -72,58 +72,6 @@
             <Setter Property="TextAlignment" Value="Left" />
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
-        <Style x:Key="secondaryButton" TargetType="Button">
-            <Setter Property="FontFamily" Value="Segoe UI" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="Black"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="0,5,0,5"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="#F2F2F2"/>
-            <Setter Property="Margin" Value="16,0,0,0" />
-            <Setter Property="Width" Value="378"/>
-            <Setter Property="Height" Value="32"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Button}">
-                        <Border Background="{TemplateBinding Background}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#BCBCBD"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="primaryButton" TargetType="Button">
-            <Setter Property="FontFamily" Value="Segoe UI" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="0,5,0,5"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Background" Value="#0078D7"/>
-            <Setter Property="Margin" Value="16,0,16,0" />
-            <Setter Property="Width" Value="377"/>
-            <Setter Property="Height" Value="32"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Button}">
-                        <Border Background="{TemplateBinding Background}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#024D89"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
         <Style x:Key="spinnerButton" TargetType="Button">
             <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="FontWeight" Value="SemiBold" />
@@ -134,19 +82,12 @@
             <Setter Property="Background" Value="#F2F2F2"/>
             <Setter Property="Margin" Value="0,0,0,0" />
         </Style>
-        <Style x:Key="newLayoutButton" TargetType="Button">
-            <Setter Property="Background" Value="#f2f2f2"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="FontFamily" Value="SegoeUI"/>
-            <Setter Property="FontWeight" Value="Light"/>
-            <Setter Property="FontSize" Value="148"/>
-        </Style>
         <Style x:Key="newCustomButton" TargetType="Button">
             <Setter Property="Background" Value="#f2f2f2"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontFamily" Value="SegoeUI"/>
             <Setter Property="FontWeight" Value="Light"/>
-            <Setter Property="FontSize" Value="120"/>
+            <Setter Property="FontSize" Value="148"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
         <Style x:Key="textBox" TargetType="TextBox">
@@ -193,9 +134,9 @@
             <TabItem Header="{x:Static props:Resources.Templates}" Template="{StaticResource myTabs}">
                 <StackPanel>
                     <StackPanel Margin="0,15,0,8" Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button x:Name="decrementZones" Width="40" Height="40" Content="-" Style="{StaticResource spinnerButton}" Click="DecrementZones_Click"/>
+                        <Button x:Name="decrementZones" Width="40" Height="40" Content="-" Style="{StaticResource spinnerButton}" Click="DecrementZones_Click" TabIndex="1"/>
                         <TextBlock x:Name="zoneCount" Text="{Binding ZoneCount}" Style="{StaticResource zoneCount}"/>
-                        <Button x:Name="incrementZones" Width="40" Height="40" Content="+" Style="{StaticResource spinnerButton}" Click="IncrementZones_Click"/>
+                        <Button x:Name="incrementZones" Width="40" Height="40" Content="+" Style="{StaticResource spinnerButton}" Click="IncrementZones_Click" TabIndex="2"/>
                     </StackPanel>
                     <ItemsControl ItemsSource="{Binding DefaultModels}" Margin="8,0,0,0">
                         <ItemsControl.ItemsPanel>
@@ -214,10 +155,10 @@
                                                HorizontalAlignment="Stretch" 
                                                LastChildFill="True">
                                         <DockPanel DockPanel.Dock="Top" LastChildFill="True" >
-                                            <Button x:Name="ApplyButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnApply" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
+                                            <Button x:Name="ApplyButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnApply" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2" TabIndex="3">
                                                 <Image Source="images/Apply.png" />
                                             </Button>
-                                            <Button x:Name="EditButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnEdit" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
+                                            <Button x:Name="EditButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnEdit" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2" TabIndex="3">
                                                 <Image Source="images/Edit.png" />
                                             </Button>
                                             <TextBlock DockPanel.Dock="Top"
@@ -234,9 +175,9 @@
                     </ItemsControl>
 
                     <StackPanel Orientation="Horizontal" Margin="10,4,0,8">
-                        <CheckBox x:Name="spaceAroundSetting" Content="Show space around zones" Style="{StaticResource settingCheckBoxText}" IsChecked="{Binding ShowSpacing}"/>
+                        <CheckBox x:Name="spaceAroundSetting" Content="Show space around zones" Style="{StaticResource settingCheckBoxText}" IsChecked="{Binding ShowSpacing}" TabIndex="5"/>
                         <TextBlock Text="Space around zones" Style="{StaticResource settingText}"/>
-                        <TextBox x:Name="paddingValue" Text="{Binding Path=Spacing,Mode=TwoWay}" TextChanged="SpacingValueChanged" Style="{StaticResource textBox}"/>
+                        <TextBox x:Name="paddingValue" Text="{Binding Path=Spacing,Mode=TwoWay}" TextChanged="SpacingValueChanged" Style="{StaticResource textBox}" TabIndex="6"/>
                     </StackPanel>
                 </StackPanel>
             </TabItem>
@@ -261,16 +202,16 @@
                                                HorizontalAlignment="Stretch" 
                                                LastChildFill="True">
                                         <DockPanel DockPanel.Dock="Top" LastChildFill="True" >
-                                            <Button x:Name="DeleteButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnDelete" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
+                                            <Button x:Name="DeleteButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnDelete" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2" TabIndex="8">
                                                 <Image Source="images/Delete.png" />
                                             </Button>
-                                            <Button x:Name="ApplyButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnApply" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
+                                            <Button x:Name="ApplyButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnApply" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2" TabIndex="8">
                                                 <Image Source="images/Apply.png" />
                                             </Button>
-                                            <Button x:Name="EditButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnEdit" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2">
+                                            <Button x:Name="EditButton" Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}" DockPanel.Dock="Right" MaxHeight="10" Click="OnEdit" Padding="8,4,8,4" Margin="0,0,8,0" BorderThickness="0" Background="#f2f2f2" TabIndex="8">
                                                 <Image Source="images/Edit.png" />
                                             </Button>
-                                            <Button x:Name="NewLayoutButton" Visibility="{Binding Converter={StaticResource NewModelToVisibilityConverter}}" Style="{StaticResource newLayoutButton}" DockPanel.Dock="Top" Click="CreateNewCustom">
+                                            <Button x:Name="NewCustomButton" Visibility="{Binding Converter={StaticResource NewModelToVisibilityConverter}}" Style="{StaticResource newCustomButton}" DockPanel.Dock="Top" Click="CreateNewCustom" TabIndex="7">
                                                 <StackPanel>
                                                     <TextBlock Text="Create new custom" Style="{StaticResource templateTitleText}"  />
                                                     <TextBlock HorizontalAlignment="Center" Text="+"/>
@@ -279,7 +220,7 @@
                                             <TextBlock DockPanel.Dock="Top" 
                                                        Visibility="{Binding Converter={StaticResource ModelToVisibilityConverter}}"
                                                        TextTrimming="CharacterEllipsis"
-                                                       Padding="8,0,8,0"
+                                                       Padding="16,0,8,0"
                                                        Text="{Binding Name}" 
                                                        Style="{StaticResource templateTitleText}" />
                                         </DockPanel>
