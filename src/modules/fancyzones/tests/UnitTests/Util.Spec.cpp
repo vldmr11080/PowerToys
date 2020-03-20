@@ -222,6 +222,28 @@ namespace FancyZonesUnitTests
                 CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
             } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
         }
+
+        TEST_METHOD(TestMonitorOrdering11)
+        {
+            // Random values, some monitors overlap, don't check order, just ensure it doesn't crash and it's the same every time
+            std::vector<std::pair<HMONITOR, RECT>> monitorInfo = {
+                {Mocks::Monitor(), RECT{.left = 410, .top = 630, .right = 988, .bottom = 631} },
+                {Mocks::Monitor(), RECT{.left = 302, .top = 189, .right = 550, .bottom = 714} },
+                {Mocks::Monitor(), RECT{.left = 158, .top = 115, .right = 657, .bottom = 499} },
+                {Mocks::Monitor(), RECT{.left = 341, .top = 340, .right = 723, .bottom = 655} },
+                {Mocks::Monitor(), RECT{.left = 433, .top = 393, .right = 846, .bottom = 544} },
+            };
+
+            auto monitorInfoPermutation = monitorInfo;
+            auto firstTime = monitorInfo;
+            OrderMonitors(firstTime);
+
+            do {
+                auto monitorInfoCopy = monitorInfoPermutation;
+                OrderMonitors(monitorInfoCopy);
+                CustomAssert::AreEqual(firstTime, monitorInfoCopy);
+            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+        }
     };
 }
 
