@@ -37,10 +37,10 @@ void OrderMonitors(std::vector<std::pair<HMONITOR, RECT>>& monitorInfo)
     for (size_t i = 0; i < monitorInfo.size(); i++)
     {
         RECT rectI = monitorInfo[i].second;
-        for (size_t j = 0; i < monitorInfo.size(); i++)
+        for (size_t j = 0; j < monitorInfo.size(); j++)
         {
             RECT rectJ = monitorInfo[j].second;
-            blocking[i][j] = rectI.bottom <= rectJ.top && rectI.right <= rectJ.left && i != j;
+            blocking[i][j] = rectI.top < rectJ.bottom && rectI.left < rectJ.right && i != j;
             if (blocking[i][j])
             {
                 blockingCount[j]++;
