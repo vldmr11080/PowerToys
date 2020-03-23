@@ -28,16 +28,17 @@ UINT GetDpiForMonitor(HMONITOR monitor) noexcept
 
 void OrderMonitors(std::vector<std::pair<HMONITOR, RECT>>& monitorInfo)
 {
+    const size_t nMonitors = monitorInfo.size();
     // blocking[i][j] - whether monitor i blocks monitor j in the ordering, i.e. monitor i should go before monitor j
-    std::vector<std::vector<bool>> blocking(monitorInfo.size(), std::vector<bool>(monitorInfo.size(), false));
+    std::vector<std::vector<bool>> blocking(nMonitors, std::vector<bool>(nMonitors, false));
 
     // blockingCount[j] - the number of monitors which block monitor j
-    std::vector<size_t> blockingCount(monitorInfo.size(), 0);
+    std::vector<size_t> blockingCount(nMonitors, 0);
 
-    for (size_t i = 0; i < monitorInfo.size(); i++)
+    for (size_t i = 0; i < nMonitors; i++)
     {
         RECT rectI = monitorInfo[i].second;
-        for (size_t j = 0; j < monitorInfo.size(); j++)
+        for (size_t j = 0; j < nMonitors; j++)
         {
             RECT rectJ = monitorInfo[j].second;
             blocking[i][j] = rectI.top < rectJ.bottom && rectI.left < rectJ.right && i != j;
@@ -49,18 +50,18 @@ void OrderMonitors(std::vector<std::pair<HMONITOR, RECT>>& monitorInfo)
     }
 
     // used[i] - whether the sorting algorithm has used monitor i so far
-    std::vector<bool> used(monitorInfo.size(), false);
+    std::vector<bool> used(nMonitors, false);
 
     // the sorted sequence of monitors
     std::vector<std::pair<HMONITOR, RECT>> sortedMonitorInfo;
 
-    for (size_t iteration = 0; iteration < monitorInfo.size(); iteration++)
+    for (size_t iteration = 0; iteration < nMonitors; iteration++)
     {
         // Indices of candidates to become the next monitor in the sequence
         std::vector<size_t> candidates;
 
         // First, find indices of all unblocked monitors
-        for (size_t i = 0; i < monitorInfo.size(); i++)
+        for (size_t i = 0; i < nMonitors; i++)
         {
             if (blockingCount[i] == 0 && !used[i])
             {
@@ -71,7 +72,7 @@ void OrderMonitors(std::vector<std::pair<HMONITOR, RECT>>& monitorInfo)
         // In the unlikely event that there are no unblocked monitors, declare all unused monitors as candidates.
         if (candidates.empty())
         {
-            for (size_t i = 0; i < monitorInfo.size(); i++)
+            for (size_t i = 0; i < nMonitors; i++)
             {
                 if (!used[i])
                 {
@@ -96,7 +97,7 @@ void OrderMonitors(std::vector<std::pair<HMONITOR, RECT>>& monitorInfo)
 
         used[smallest] = true;
         sortedMonitorInfo.push_back(monitorInfo[smallest]);
-        for (size_t i = 0; i < monitorInfo.size(); i++)
+        for (size_t i = 0; i < nMonitors; i++)
         {
             if (blocking[smallest][i])
             {
