@@ -165,7 +165,6 @@ namespace FancyZonesUnitTests
             // |       ||       |
             // |       ||       |
             // ------------------
-
             std::vector<std::pair<HMONITOR, RECT>> monitorInfo = {
                 {Mocks::Monitor(), RECT{.left = 0, .top = 0, .right = 600, .bottom = 400} },
                 {Mocks::Monitor(), RECT{.left = 600, .top = 0, .right = 1200, .bottom = 400} },
