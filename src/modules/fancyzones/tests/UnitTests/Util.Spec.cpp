@@ -158,8 +158,14 @@ namespace FancyZonesUnitTests
 
         TEST_METHOD(TestMonitorOrdering08)
         {
-            // AABBCC
-            // DDDEEE
+            // ------------------
+            // |    ||    ||    |
+            // |    ||    ||    |
+            // ------------------
+            // |       ||       |
+            // |       ||       |
+            // ------------------
+
             std::vector<std::pair<HMONITOR, RECT>> monitorInfo = {
                 {Mocks::Monitor(), RECT{.left = 0, .top = 0, .right = 600, .bottom = 400} },
                 {Mocks::Monitor(), RECT{.left = 600, .top = 0, .right = 1200, .bottom = 400} },
@@ -204,8 +210,13 @@ namespace FancyZonesUnitTests
 
         TEST_METHOD(TestMonitorOrdering10)
         {
-            // AAABBB
-            // CCDDEE
+            // ------------------
+            // |       ||       |
+            // |       ||       |
+            // ------------------
+            // |    ||    ||    |
+            // |    ||    ||    |
+            // ------------------
             std::vector<std::pair<HMONITOR, RECT>> monitorInfo = {
                 {Mocks::Monitor(), RECT{.left = 0, .top = 0, .right = 900, .bottom = 400} },
                 {Mocks::Monitor(), RECT{.left = 900, .top = 0, .right = 1800, .bottom = 400} },
