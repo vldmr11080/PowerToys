@@ -140,7 +140,7 @@ namespace FancyZonesUnitTests
 
         TEST_METHOD(TestMonitorOrdering07)
         {
-            // Three vertically arranged monitors, left aligned, with equal sizes, except the middle monitor is a bit wider
+            // Three vertically arranged monitors, center aligned, with equal sizes, except the middle monitor is a bit wider
             std::vector<std::pair<HMONITOR, RECT>> monitorInfo = {
                 {Mocks::Monitor(), RECT{.left = 100, .top = 0, .right = 1700, .bottom = 900} },
                 {Mocks::Monitor(), RECT{.left = 0, .top = 900, .right = 1800, .bottom = 1800} },
