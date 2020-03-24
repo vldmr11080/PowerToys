@@ -6,6 +6,36 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace FancyZonesUnitTests
 {
+    void TestMonitorSetPermutations(const std::vector<std::pair<HMONITOR, RECT>>& monitorInfo)
+    {
+        auto monitorInfoPermutation = monitorInfo;
+
+        do {
+            auto monitorInfoCopy = monitorInfoPermutation;
+            OrderMonitors(monitorInfoCopy);
+            CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
+        } while (std::next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+    }
+
+    void TestMonitorSetPermutationsOffsets(const std::vector<std::pair<HMONITOR, RECT>>& monitorInfo)
+    {
+        for (int offsetX = -3000; offsetX <= 3000; offsetX += 1000)
+        {
+            for (int offsetY = -3000; offsetY <= 3000; offsetY += 1000)
+            {
+                auto monitorInfoCopy = monitorInfo;
+                for (auto& [monitor, rect] : monitorInfoCopy)
+                {
+                    rect.left += offsetX;
+                    rect.right += offsetX;
+                    rect.top += offsetY;
+                    rect.bottom += offsetY;
+                }
+                TestMonitorSetPermutations(monitorInfoCopy);
+            }
+        }
+    }
+
     TEST_CLASS(UtilUnitTests)
     {
         TEST_METHOD(TestParseDeviceId)
@@ -39,13 +69,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 3300, .top = 0, .right = 5100, .bottom = 1100} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering02)
@@ -57,13 +81,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 3200, .top = 0, .right = 4800, .bottom = 900} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering03)
@@ -75,13 +93,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 3500, .top = 200, .right = 5100, .bottom = 1100} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering04)
@@ -93,13 +105,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 3300, .top = 0, .right = 5100, .bottom = 1100} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering05)
@@ -111,13 +117,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 3200, .top = 0, .right = 4800, .bottom = 900} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering06)
@@ -129,13 +129,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 3500, .top = 0, .right = 5100, .bottom = 900} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering07)
@@ -147,13 +141,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 100, .top = 1800, .right = 1700, .bottom = 2700} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering08)
@@ -173,13 +161,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 900, .top = 400, .right = 1800, .bottom = 800} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering09)
@@ -224,13 +206,7 @@ namespace FancyZonesUnitTests
                 {Mocks::Monitor(), RECT{.left = 1200, .top = 400, .right = 1800, .bottom = 800} },
             };
 
-            auto monitorInfoPermutation = monitorInfo;
-
-            do {
-                auto monitorInfoCopy = monitorInfoPermutation;
-                OrderMonitors(monitorInfoCopy);
-                CustomAssert::AreEqual(monitorInfo, monitorInfoCopy);
-            } while (next_permutation(monitorInfoPermutation.begin(), monitorInfoPermutation.end(), [](auto x, auto y) { return x.first < y.first; }));
+            TestMonitorSetPermutationsOffsets(monitorInfo);
         }
 
         TEST_METHOD(TestMonitorOrdering11)
