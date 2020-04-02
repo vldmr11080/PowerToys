@@ -2,7 +2,8 @@
 #include "Settings.h"
 #include "PowerRenameInterfaces.h"
 
-#include <settings_helpers.h>
+#include <common/settings_helpers.h>
+
 #include <filesystem>
 #include <commctrl.h>
 
@@ -495,15 +496,15 @@ void CSettings::SavePowerRenameData() const
 
     json::JsonObject jsonData;
 
-    jsonData.SetNamedValue(c_enabled, json::value(settings.enabled));
-    jsonData.SetNamedValue(c_showIconOnMenu, json::value(settings.showIconOnMenu));
+    jsonData.SetNamedValue(c_enabled,                 json::value(settings.enabled));
+    jsonData.SetNamedValue(c_showIconOnMenu,          json::value(settings.showIconOnMenu));
     jsonData.SetNamedValue(c_extendedContextMenuOnly, json::value(settings.extendedContextMenuOnly));
-    jsonData.SetNamedValue(c_persistState, json::value(settings.persistState));
-    jsonData.SetNamedValue(c_mruEnabled, json::value(settings.MRUEnabled));
-    jsonData.SetNamedValue(c_maxMRUSize, json::value(settings.maxMRUSize));
-    jsonData.SetNamedValue(c_flags, json::value(settings.flags));
-    jsonData.SetNamedValue(c_searchText, json::value(settings.searchText));
-    jsonData.SetNamedValue(c_replaceText, json::value(settings.replaceText));
+    jsonData.SetNamedValue(c_persistState,            json::value(settings.persistState));
+    jsonData.SetNamedValue(c_mruEnabled,              json::value(settings.MRUEnabled));
+    jsonData.SetNamedValue(c_maxMRUSize,              json::value(settings.maxMRUSize));
+    jsonData.SetNamedValue(c_flags,                   json::value(settings.flags));
+    jsonData.SetNamedValue(c_searchText,              json::value(settings.searchText));
+    jsonData.SetNamedValue(c_replaceText,             json::value(settings.replaceText));
 
     json::to_file(jsonFilePath, jsonData);
 }

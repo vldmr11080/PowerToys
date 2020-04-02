@@ -1,7 +1,9 @@
 #pragma once
 
-#include <json.h>
+#include <common/json.h>
+
 #include <string>
+#include <mutex>
 
 class CSettings
 {
