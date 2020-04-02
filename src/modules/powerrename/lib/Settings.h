@@ -10,77 +10,32 @@ public:
 
     CSettings();
 
-    inline bool GetEnabled() const {
-        return mSettings.mEnabled;
-    }
+    bool GetEnabled() const;
+    void SetEnabled(bool enabled);
 
-    inline void SetEnabled(bool enabled) {
-        mSettings.mEnabled = enabled;
-    }
+    bool GetShowIconOnMenu() const;
+    void SetShowIconOnMenu(bool show);
 
-    inline bool GetShowIconOnMenu() const {
-        return mSettings.mShowIconOnMenu;
-    }
+    bool GetExtendedContextMenuOnly() const;
+    void SetExtendedContextMenuOnly(bool extendedOnly);
 
-    inline void SetShowIconOnMenu(bool show) {
-        mSettings.mShowIconOnMenu = show;
-    }
+    bool GetPersistState() const;
+    void SetPersistState(bool persistState);
 
-    inline bool GetExtendedContextMenuOnly() const {
-        return mSettings.mExtendedContextMenuOnly;
-    }
+    bool GetMRUEnabled() const;
+    void SetMRUEnabled(bool MRUEenabled);
 
-    inline void SetExtendedContextMenuOnly(bool extendedOnly) {
-        mSettings.mExtendedContextMenuOnly = extendedOnly;
-    }
+    long GetMaxMRUSize() const;
+    void SetMaxMRUSize(long maxMRUSize);
 
-    inline bool GetPersistState() const {
-        return mSettings.mPersistState;
-    }
+    long GetFlags() const;
+    void SetFlags(long flags);
 
-    inline void SetPersistState(bool persistState) {
-        mSettings.mPersistState = persistState;
-    }
+    const std::wstring& GetSearchText() const;
+    void SetSearchText(const std::wstring& text);
 
-    inline bool GetMRUEnabled() const {
-        return mSettings.mMRUEnabled;
-    }
-
-    inline void SetMRUEnabled(bool enabled) {
-        mSettings.mMRUEnabled = enabled;
-    }
-
-    inline long GetMaxMRUSize() const {
-        return mSettings.mMaxMRUSize;
-    }
-
-    inline void SetMaxMRUSize(long maxMRUSize) {
-        mSettings.mMaxMRUSize = maxMRUSize;
-    }
-
-    inline long GetFlags() const {
-        return mSettings.mFlags;
-    }
-
-    inline void SetFlags(long flags) {
-        mSettings.mFlags = flags;
-    }
-
-    inline const std::wstring& GetSearchText() const {
-        return mSettings.mSearchText;
-    }
-
-    inline void SetSearchText(const std::wstring& text) {
-        mSettings.mSearchText = text;
-    }
-
-    inline const std::wstring& GetReplaceText() const {
-        return mSettings.mReplaceText;
-    }
-
-    inline void SetReplaceText(const std::wstring& text) {
-        mSettings.mReplaceText = text;
-    }
+    const std::wstring& GetReplaceText() const;
+    void SetReplaceText(const std::wstring& text);
 
     void LoadPowerRenameData();
     void SavePowerRenameData() const;
@@ -88,24 +43,26 @@ public:
 private:
     struct Settings
     {
-        bool mEnabled{ true };
-        bool mShowIconOnMenu{ true };
-        bool mExtendedContextMenuOnly{ false };
-        bool mPersistState{ true };
-        bool mMRUEnabled{ true };
-        long mMaxMRUSize{ 10 };
-        long mFlags{ 0 };
-        std::wstring mSearchText;
-        std::wstring mReplaceText;
+        bool enabled{ true };
+        bool showIconOnMenu{ true };
+        bool extendedContextMenuOnly{ false }; // Disabled by default.
+        bool persistState{ true };
+        bool MRUEnabled{ true };
+        long maxMRUSize{ 10 };
+        long flags{ 0 };
+        std::wstring searchText;
+        std::wstring replaceText;
     };
 
-    json::JsonObject GetPersistPowerRenameData();
+    json::JsonObject GetPersistPowerRenameJSON();
 
     void MigrateSettingsFromRegistry();
     void ParseJsonSettings(const json::JsonObject& jsonSettings);
 
-    Settings mSettings;
-    std::wstring mJsonFilePath;
+    Settings settings;
+    std::wstring jsonFilePath;
+
+    mutable std::recursive_mutex dataLock;
 };
 
 CSettings& CSettingsInstance();
