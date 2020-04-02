@@ -1,45 +1,114 @@
 #pragma once
 
+#include <json.h>
+#include <string>
+
 class CSettings
 {
 public:
     static const int MAX_INPUT_STRING_LEN = 1024;
 
-    static bool GetEnabled();
-    static bool SetEnabled(_In_ bool enabled);
+    CSettings();
 
-    static bool GetShowIconOnMenu();
-    static bool SetShowIconOnMenu(_In_ bool show);
+    inline bool GetEnabled() const {
+        return mSettings.mEnabled;
+    }
 
-    static bool GetExtendedContextMenuOnly();
-    static bool SetExtendedContextMenuOnly(_In_ bool extendedOnly);
+    inline void SetEnabled(bool enabled) {
+        mSettings.mEnabled = enabled;
+    }
 
-    static bool GetPersistState();
-    static bool SetPersistState(_In_ bool extendedOnly);
+    inline bool GetShowIconOnMenu() const {
+        return mSettings.mShowIconOnMenu;
+    }
 
-    static bool GetMRUEnabled();
-    static bool SetMRUEnabled(_In_ bool enabled);
+    inline void SetShowIconOnMenu(bool show) {
+        mSettings.mShowIconOnMenu = show;
+    }
 
-    static DWORD GetMaxMRUSize();
-    static bool SetMaxMRUSize(_In_ DWORD maxMRUSize);
+    inline bool GetExtendedContextMenuOnly() const {
+        return mSettings.mExtendedContextMenuOnly;
+    }
 
-    static DWORD GetFlags();
-    static bool SetFlags(_In_ DWORD flags);
+    inline void SetExtendedContextMenuOnly(bool extendedOnly) {
+        mSettings.mExtendedContextMenuOnly = extendedOnly;
+    }
 
-    static bool GetSearchText(__out_ecount(cchBuf) PWSTR text, DWORD cchBuf);
-    static bool SetSearchText(_In_ PCWSTR text);
+    inline bool GetPersistState() const {
+        return mSettings.mPersistState;
+    }
 
-    static bool GetReplaceText(__out_ecount(cchBuf) PWSTR text, DWORD cchBuf);
-    static bool SetReplaceText(_In_ PCWSTR text);
+    inline void SetPersistState(bool persistState) {
+        mSettings.mPersistState = persistState;
+    }
+
+    inline bool GetMRUEnabled() const {
+        return mSettings.mMRUEnabled;
+    }
+
+    inline void SetMRUEnabled(bool enabled) {
+        mSettings.mMRUEnabled = enabled;
+    }
+
+    inline long GetMaxMRUSize() const {
+        return mSettings.mMaxMRUSize;
+    }
+
+    inline void SetMaxMRUSize(long maxMRUSize) {
+        mSettings.mMaxMRUSize = maxMRUSize;
+    }
+
+    inline long GetFlags() const {
+        return mSettings.mFlags;
+    }
+
+    inline void SetFlags(long flags) {
+        mSettings.mFlags = flags;
+    }
+
+    inline const std::wstring& GetSearchText() const {
+        return mSettings.mSearchText;
+    }
+
+    inline void SetSearchText(const std::wstring& text) {
+        mSettings.mSearchText = text;
+    }
+
+    inline const std::wstring& GetReplaceText() const {
+        return mSettings.mReplaceText;
+    }
+
+    inline void SetReplaceText(const std::wstring& text) {
+        mSettings.mReplaceText = text;
+    }
+
+    void LoadPowerRenameData();
+    void SavePowerRenameData() const;
 
 private:
-    static bool GetRegBoolValue(_In_ PCWSTR valueName, _In_ bool defaultValue);
-    static bool SetRegBoolValue(_In_ PCWSTR valueName, _In_ bool value);
-    static bool SetRegDWORDValue(_In_ PCWSTR valueName, _In_ DWORD value);
-    static DWORD GetRegDWORDValue(_In_ PCWSTR valueName, _In_ DWORD defaultValue);
-    static bool SetRegStringValue(_In_ PCWSTR valueName, _In_ PCWSTR value);
-    static bool GetRegStringValue(_In_ PCWSTR valueName, __out_ecount(cchBuf) PWSTR value, DWORD cchBuf);
+    struct Settings
+    {
+        bool mEnabled{ true };
+        bool mShowIconOnMenu{ true };
+        bool mExtendedContextMenuOnly{ false };
+        bool mPersistState{ true };
+        bool mMRUEnabled{ true };
+        long mMaxMRUSize{ 10 };
+        long mFlags{ 0 };
+        std::wstring mSearchText;
+        std::wstring mReplaceText;
+    };
+
+    json::JsonObject GetPersistPowerRenameData();
+
+    void MigrateSettingsFromRegistry();
+    void ParseJsonSettings(const json::JsonObject& jsonSettings);
+
+    Settings mSettings;
+    std::wstring mJsonFilePath;
 };
+
+CSettings& CSettingsInstance();
 
 HRESULT CRenameMRUSearch_CreateInstance(_Outptr_ IUnknown** ppUnk);
 HRESULT CRenameMRUReplace_CreateInstance(_Outptr_ IUnknown** ppUnk);
