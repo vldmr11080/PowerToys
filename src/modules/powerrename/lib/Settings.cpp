@@ -1,8 +1,7 @@
 #include "stdafx.h"
 #include "Settings.h"
 #include "PowerRenameInterfaces.h"
-
-#include <common/settings_helpers.h>
+#include "settings_helpers.h"
 
 #include <filesystem>
 #include <commctrl.h>
