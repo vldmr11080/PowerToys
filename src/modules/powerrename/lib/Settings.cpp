@@ -12,8 +12,8 @@ namespace
     const wchar_t c_powerRenameDataFilePath[] = L"power-rename-settings.json";
 
     const wchar_t c_rootRegPath[] = L"Software\\Microsoft\\PowerRename";
-    const wchar_t c_mruSearchRegPath[] = L"SearchMRU";
-    const wchar_t c_mruReplaceRegPath[] = L"ReplaceMRU";
+    const wchar_t c_mruSearchRegPath[] = L"\\SearchMRU";
+    const wchar_t c_mruReplaceRegPath[] = L"\\ReplaceMRU";
 
     const wchar_t c_enabled[] = L"Enabled";
     const wchar_t c_showIconOnMenu[] = L"ShowIcon";
@@ -24,6 +24,9 @@ namespace
     const wchar_t c_searchText[] = L"SearchText";
     const wchar_t c_replaceText[] = L"ReplaceText";
     const wchar_t c_mruEnabled[] = L"MRUEnabled";
+    const wchar_t c_mruList[] = L"MRUList";
+    const wchar_t c_mruSearchList[] = L"MRUSearchList";
+    const wchar_t c_mruReplaceList[] = L"MRUReplaceList";
 
     long GetRegNumber(const std::wstring& valueName, long defaultValue)
     {
@@ -53,16 +56,15 @@ namespace
         SetRegNumber(valueName, value ? 1 : 0);
     }
 
-    std::wstring GetRegString(const std::wstring& valueName) {
+    std::wstring GetRegString(const std::wstring& valueName,const std::wstring& subPath)
+    {
         wchar_t value[CSettings::MAX_INPUT_STRING_LEN];
         value[0] = L'\0';
         DWORD type = REG_SZ;
         DWORD size = CSettings::MAX_INPUT_STRING_LEN * sizeof(wchar_t);
-        if (SUCCEEDED(HRESULT_FROM_WIN32(SHGetValue(HKEY_CURRENT_USER, c_rootRegPath, valueName.c_str(), &type, value, &size) == ERROR_SUCCESS)))
-        {
-            return std::wstring(value);
-        }
-        return std::wstring{};
+        std::wstring completePath = std::wstring(c_rootRegPath) + subPath;
+        SHGetValue(HKEY_CURRENT_USER, completePath.c_str(), valueName.c_str(), &type, value, &size);
+        return std::wstring(value);
     }
 }
 
@@ -98,10 +100,7 @@ private:
 CRenameMRU::CRenameMRU(CSettings::MRUStringType type, long maxMRUSize) :
     MRUType(type),
     maxMRUSize(maxMRUSize),
-    refCount(1)
-{
-
-}
+    refCount(1) {}
 
 HRESULT CRenameMRU::CreateInstance(_In_ CSettings::MRUStringType type, _Outptr_ IUnknown** ppUnk)
 {
@@ -281,14 +280,14 @@ void CSettings::SavePowerRenameData() const
             searchMRUList->Reset();
             json::JsonArray searchMRU{};
 
-            jsonData.SetNamedValue(c_mruSearchRegPath, searchMRU);
+            jsonData.SetNamedValue(c_mruSearchList, searchMRU);
         }
         if (replaceMRUList)
         {
             replaceMRUList->Reset();
             json::JsonArray replaceMRU{};
 
-            jsonData.SetNamedValue(c_mruReplaceRegPath, replaceMRU);
+            jsonData.SetNamedValue(c_mruReplaceList, replaceMRU);
         }
     }
 
@@ -303,8 +302,31 @@ void CSettings::MigrateSettingsFromRegistry()
     settings.MRUEnabled              = GetRegBoolean(c_mruEnabled, true);
     settings.maxMRUSize              = GetRegNumber(c_maxMRUSize, 10);
     settings.flags                   = GetRegNumber(c_flags, 0);
-    settings.searchText              = GetRegString(c_searchText);
-    settings.replaceText             = GetRegString(c_replaceText);
+    settings.searchText              = GetRegString(c_searchText, L"");
+    settings.replaceText             = GetRegString(c_replaceText, L"");
+
+    MigrateSearchMRUList();
+    MigrateReplaceMRUList();
+}
+
+void CSettings::MigrateSearchMRUList()
+{
+    searchMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
+    std::wstring searchListKeys = GetRegString(c_mruList, c_mruSearchRegPath);
+    for (const wchar_t& key : searchListKeys)
+    {
+        searchMRUList->Push(GetRegString(std::wstring(1, key), c_mruSearchRegPath));
+    }
+}
+
+void CSettings::MigrateReplaceMRUList()
+{
+    replaceMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
+    std::wstring replaceListKeys = GetRegString(c_mruList, c_mruReplaceRegPath);
+    for (const wchar_t& key : replaceListKeys)
+    {
+        replaceMRUList->Push(GetRegString(std::wstring(1, key), c_mruReplaceRegPath));
+    }
 }
 
 void CSettings::ParseJsonSettings()
@@ -346,6 +368,24 @@ void CSettings::ParseJsonSettings()
             if (json::has(jsonSettings, c_replaceText, json::JsonValueType::String))
             {
                 settings.replaceText = jsonSettings.GetNamedString(c_replaceText);
+            }
+            if (json::has(jsonSettings, c_mruSearchList, json::JsonValueType::Array))
+            {
+                searchMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
+                auto searchList = jsonSettings.GetNamedArray(c_mruSearchList);
+                for (uint32_t i = 0; i < searchList.Size(); ++i)
+                {
+                    searchMRUList->Push(std::wstring(searchList.GetStringAt(i)));
+                }
+            }
+            if (json::has(jsonSettings, c_mruReplaceList, json::JsonValueType::Array))
+            {
+                replaceMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
+                auto replaceList = jsonSettings.GetNamedArray(c_mruReplaceList);
+                for (uint32_t i = 0; i < replaceList.Size(); ++i)
+                {
+                    replaceMRUList->Push(std::wstring(replaceList.GetStringAt(i)));
+                }
             }
         }
         catch (const winrt::hresult_error&) { }
@@ -403,5 +443,5 @@ void CSettings::MRUList::Reset()
 
 bool CSettings::MRUList::Exists(const std::wstring& item)
 {
-    return std::find(std::begin(items), std::end(items), item) == std::end(items);
+    return std::find(std::begin(items), std::end(items), item) != std::end(items);
 }

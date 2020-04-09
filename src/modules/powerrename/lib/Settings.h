@@ -158,6 +158,9 @@ private:
     };
 
     void MigrateSettingsFromRegistry();
+    void MigrateSearchMRUList();
+    void MigrateReplaceMRUList();
+
     void ParseJsonSettings();
 
     Settings settings;
