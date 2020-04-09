@@ -9,6 +9,12 @@ class CSettings
 public:
     static const int MAX_INPUT_STRING_LEN = 1024;
 
+    enum class MRUStringType
+    {
+        MRU_SEARCH,
+        MRU_REPLACE
+    };
+
     CSettings();
 
     bool GetEnabled();
@@ -63,6 +69,14 @@ public:
     inline void SetMaxMRUSize(long maxMRUSize)
     {
         settings.maxMRUSize = maxMRUSize;
+        if (searchMRUList)
+        {
+            searchMRUList->Resize(maxMRUSize);
+        }
+        if (replaceMRUList)
+        {
+            replaceMRUList->Resize(maxMRUSize);
+        }
     }
 
     inline long GetFlags() const
@@ -95,6 +109,10 @@ public:
         settings.replaceText = text;
     }
 
+    void AddMRUString(const std::wstring& data, MRUStringType type);
+    std::pair<std::wstring, bool> Next(MRUStringType type);
+    void ResetMRUList(MRUStringType type);
+
     void LoadPowerRenameData();
     void SavePowerRenameData() const;
 
@@ -111,11 +129,42 @@ private:
         std::wstring replaceText{};
     };
 
+    class MRUList
+    {
+    public:
+        MRUList(int size) :
+            consumeIdx(0),
+            pushIdx(0),
+            start(0),
+            size(size)
+        {
+
+        }
+
+        void Push(const std::wstring& item);
+        std::pair<std::wstring, bool> Next();
+
+        void Resize(int size);
+        void Reset();
+
+    private:
+        bool Exists(const std::wstring& item);
+
+        std::vector<std::wstring> items;
+        int consumeIdx; // index from which next element should be consumed
+        int pushIdx; // index on which new element should be added
+        int start; // starting index of sliding window
+        int size;
+    };
+
     void MigrateSettingsFromRegistry();
     void ParseJsonSettings();
 
     Settings settings;
     std::wstring jsonFilePath;
+
+    std::unique_ptr<MRUList> searchMRUList{ nullptr };
+    std::unique_ptr<MRUList> replaceMRUList{ nullptr };
 };
 
 CSettings& CSettingsInstance();

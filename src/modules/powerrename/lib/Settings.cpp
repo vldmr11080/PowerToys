@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <commctrl.h>
+#include <algorithm>
 
 namespace
 {
@@ -65,22 +66,6 @@ namespace
     }
 }
 
-typedef int (CALLBACK* MRUCMPPROC)(LPCWSTR, LPCWSTR);
-
-typedef struct {
-    DWORD      cbSize;
-    UINT       uMax;
-    UINT       fFlags;
-    HKEY       hKey;
-    LPCTSTR    lpszSubKey;
-    MRUCMPPROC lpfnCompare;
-} MRUINFO;
-
-typedef HANDLE (*CreateMRUListFn)(MRUINFO* pmi);
-typedef int (*AddMRUStringFn)(HANDLE hMRU, LPCWSTR data);
-typedef int (*EnumMRUListFn)(HANDLE hMRU, int nItem, void* lpData, UINT uLen);
-typedef int (*FreeMRUListFn)(HANDLE hMRU);
-
 class CRenameMRU :
     public IEnumString,
     public IPowerRenameMRU
@@ -100,65 +85,36 @@ public:
     // IPowerRenameMRU
     IFACEMETHODIMP AddMRUString(_In_ PCWSTR entry);
 
-    static HRESULT CreateInstance(_In_ PCWSTR regPathMRU, _In_ ULONG maxMRUSize, _Outptr_ IUnknown** ppUnk);
+    static HRESULT CreateInstance(_In_ CSettings::MRUStringType type, _Outptr_ IUnknown** ppUnk);
 
 private:
-    CRenameMRU();
-    ~CRenameMRU();
+    CRenameMRU(CSettings::MRUStringType type, long maxMRUSize);
 
-    HRESULT _Initialize(_In_ PCWSTR regPathMRU, __in ULONG maxMRUSize);
-    HRESULT _CreateMRUList(_In_ MRUINFO* pmi);
-    int _AddMRUString(_In_ PCWSTR data);
-    int _EnumMRUList(_In_ int nItem, _Out_ void* lpData, _In_ UINT uLen);
-    void _FreeMRUList();
-
-    long   m_refCount = 0;
-    HKEY   m_hKey = NULL;
-    ULONG  m_maxMRUSize = 0;
-    ULONG  m_mruIndex = 0;
-    ULONG  m_mruSize = 0;
-    HANDLE m_mruHandle = NULL;
-    HMODULE m_hComctl32Dll = NULL;
-    PWSTR  m_regPath = nullptr;
+    CSettings::MRUStringType MRUType;
+    long maxMRUSize = 0;
+    long refCount = 0;
 };
 
-CRenameMRU::CRenameMRU() :
-    m_refCount(1)
-{}
-
-CRenameMRU::~CRenameMRU()
+CRenameMRU::CRenameMRU(CSettings::MRUStringType type, long maxMRUSize) :
+    MRUType(type),
+    maxMRUSize(maxMRUSize),
+    refCount(1)
 {
-    if (m_hKey)
-    {
-        RegCloseKey(m_hKey);
-    }
 
-    _FreeMRUList();
-
-    if (m_hComctl32Dll)
-    {
-        FreeLibrary(m_hComctl32Dll);
-    }
-
-    CoTaskMemFree(m_regPath);
 }
 
-HRESULT CRenameMRU::CreateInstance(_In_ PCWSTR regPathMRU, _In_ ULONG maxMRUSize, _Outptr_ IUnknown** ppUnk)
+HRESULT CRenameMRU::CreateInstance(_In_ CSettings::MRUStringType type, _Outptr_ IUnknown** ppUnk)
 {
     *ppUnk = nullptr;
-    HRESULT hr = (regPathMRU && maxMRUSize > 0) ? S_OK : E_FAIL;
+    long maxMRUSize = CSettingsInstance().GetMaxMRUSize();
+    HRESULT hr = maxMRUSize > 0 ? S_OK : E_FAIL;
     if (SUCCEEDED(hr))
     {
-        CRenameMRU* renameMRU = new CRenameMRU();
+        CRenameMRU* renameMRU = new CRenameMRU(type, maxMRUSize);
         hr = renameMRU ? S_OK : E_OUTOFMEMORY;
         if (SUCCEEDED(hr))
         {
-            hr = renameMRU->_Initialize(regPathMRU, maxMRUSize);
-            if (SUCCEEDED(hr))
-            {
-                hr = renameMRU->QueryInterface(IID_PPV_ARGS(ppUnk));
-            }
-
+            renameMRU->QueryInterface(IID_PPV_ARGS(ppUnk));
             renameMRU->Release();
         }
     }
@@ -169,12 +125,12 @@ HRESULT CRenameMRU::CreateInstance(_In_ PCWSTR regPathMRU, _In_ ULONG maxMRUSize
 // IUnknown
 IFACEMETHODIMP_(ULONG) CRenameMRU::AddRef()
 {
-    return InterlockedIncrement(&m_refCount);
+    return InterlockedIncrement(&refCount);
 }
 
 IFACEMETHODIMP_(ULONG) CRenameMRU::Release()
 {
-    long refCount = InterlockedDecrement(&m_refCount);
+    long refCount = InterlockedDecrement(&refCount);
 
     if (refCount == 0)
     {
@@ -193,57 +149,16 @@ IFACEMETHODIMP CRenameMRU::QueryInterface(_In_ REFIID riid, _Outptr_ void** ppv)
     return QISearch(this, qit, riid, ppv);
 }
 
-HRESULT CRenameMRU::_Initialize(_In_ PCWSTR regPathMRU, __in ULONG maxMRUSize)
-{
-    m_maxMRUSize = maxMRUSize;
-
-    wchar_t regPath[MAX_PATH] = { 0 };
-    HRESULT hr = StringCchPrintf(regPath, ARRAYSIZE(regPath), L"%s\\%s", c_rootRegPath, regPathMRU);
-    if (SUCCEEDED(hr))
-    {
-        hr = SHStrDup(regPathMRU, &m_regPath);
-
-        if (SUCCEEDED(hr))
-        {
-            MRUINFO mi = {
-                sizeof(MRUINFO),
-                maxMRUSize,
-                0,
-                HKEY_CURRENT_USER,
-                regPath,
-                nullptr
-            };
-
-            hr = _CreateMRUList(&mi);
-            if (SUCCEEDED(hr))
-            {
-                m_mruSize = _EnumMRUList(-1, NULL, 0);
-            }
-            else
-            {
-                hr = E_FAIL;
-            }
-        }
-    }
-
-    return hr;
-}
 
 // IEnumString
 IFACEMETHODIMP CRenameMRU::Reset()
 {
-    m_mruIndex = 0;
+    CSettingsInstance().ResetMRUList(MRUType);
     return S_OK;
 }
 
-#define MAX_ENTRY_STRING 1024
-
 IFACEMETHODIMP CRenameMRU::Next(__in ULONG celt, __out_ecount_part(celt, *pceltFetched) LPOLESTR* rgelt, __out_opt ULONG* pceltFetched)
 {
-    HRESULT hr = S_OK;
-    WCHAR mruEntry[MAX_ENTRY_STRING];
-    mruEntry[0] = L'\0';
-
     if (pceltFetched)
     {
         *pceltFetched = 0;
@@ -259,10 +174,11 @@ IFACEMETHODIMP CRenameMRU::Next(__in ULONG celt, __out_ecount_part(celt, *pceltF
         return S_FALSE;
     }
 
-    hr = S_FALSE;
-    if (m_mruIndex <= m_mruSize && _EnumMRUList(m_mruIndex++, (void*)mruEntry, ARRAYSIZE(mruEntry)) > 0)
+    HRESULT hr = S_FALSE;
+    auto nextIt = CSettingsInstance().Next(MRUType);
+    if (nextIt.second)
     {
-        hr = SHStrDup(mruEntry, rgelt);
+        hr = SHStrDup(nextIt.first.c_str(), rgelt);
         if (SUCCEEDED(hr) && pceltFetched != nullptr)
         {
             *pceltFetched = 1;
@@ -274,99 +190,8 @@ IFACEMETHODIMP CRenameMRU::Next(__in ULONG celt, __out_ecount_part(celt, *pceltF
 
 IFACEMETHODIMP CRenameMRU::AddMRUString(_In_ PCWSTR entry)
 {
-    return (_AddMRUString(entry) < 0) ? E_FAIL : S_OK;
-}
-
-HRESULT CRenameMRU::_CreateMRUList(_In_ MRUINFO* pmi)
-{
-    if (m_mruHandle != NULL)
-    {
-        _FreeMRUList();
-    }
-
-    if (m_hComctl32Dll == NULL)
-    {
-        m_hComctl32Dll = LoadLibraryEx(L"comctl32.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    }
-
-    if (m_hComctl32Dll != nullptr)
-    {
-        CreateMRUListFn pfnCreateMRUList = reinterpret_cast<CreateMRUListFn>(GetProcAddress(m_hComctl32Dll, (LPCSTR)MAKEINTRESOURCE(400)));
-        if (pfnCreateMRUList != nullptr)
-        {
-            m_mruHandle = pfnCreateMRUList(pmi);
-        }
-    }
-
-    return (m_mruHandle != NULL) ? S_OK : E_FAIL;
-}
-
-int CRenameMRU::_AddMRUString(_In_ PCWSTR data)
-{
-    int retVal = -1;
-    if (m_mruHandle != NULL)
-    {
-        if (m_hComctl32Dll == NULL)
-        {
-            m_hComctl32Dll = LoadLibraryEx(L"comctl32.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
-        }
-
-        if (m_hComctl32Dll != nullptr)
-        {
-            AddMRUStringFn pfnAddMRUString = reinterpret_cast<AddMRUStringFn>(GetProcAddress(m_hComctl32Dll, (LPCSTR)MAKEINTRESOURCE(401)));
-            if (pfnAddMRUString != nullptr)
-            {
-                retVal = pfnAddMRUString(m_mruHandle, data);
-            }
-        }
-    }
-
-    return retVal;
-}
-
-int CRenameMRU::_EnumMRUList(_In_ int nItem, _Out_ void* lpData, _In_ UINT uLen)
-{
-    int retVal = -1;
-    if (m_mruHandle != NULL)
-    {
-        if (m_hComctl32Dll == NULL)
-        {
-            m_hComctl32Dll = LoadLibraryEx(L"comctl32.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
-        }
-
-        if (m_hComctl32Dll != nullptr)
-        {
-            EnumMRUListFn pfnEnumMRUList = reinterpret_cast<EnumMRUListFn>(GetProcAddress(m_hComctl32Dll, (LPCSTR)MAKEINTRESOURCE(403)));
-            if (pfnEnumMRUList != nullptr)
-            {
-                retVal = pfnEnumMRUList(m_mruHandle, nItem, lpData, uLen);
-            }
-        }
-    }
-
-    return retVal;
-}
-
-void CRenameMRU::_FreeMRUList()
-{
-    if (m_mruHandle != NULL)
-    {
-        if (m_hComctl32Dll == NULL)
-        {
-            m_hComctl32Dll = LoadLibraryEx(L"comctl32.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
-        }
-
-        if (m_hComctl32Dll != nullptr)
-        {
-            FreeMRUListFn pfnFreeMRUList = reinterpret_cast<FreeMRUListFn>(GetProcAddress(m_hComctl32Dll, (LPCSTR)MAKEINTRESOURCE(152)));
-            if (pfnFreeMRUList != nullptr)
-            {
-                pfnFreeMRUList(m_mruHandle);
-            }
-            
-        }
-        m_mruHandle = NULL;
-    }
+    CSettingsInstance().AddMRUString(entry, MRUType);
+    return S_OK;
 }
 
 CSettings::CSettings()
@@ -383,6 +208,43 @@ bool CSettings::GetEnabled()
 void CSettings::SetEnabled(bool enabled)
 {
     SetRegBoolean(c_enabled, enabled);
+}
+
+void CSettings::AddMRUString(const std::wstring& data, MRUStringType type)
+{
+    if (type == MRUStringType::MRU_SEARCH && searchMRUList)
+    {
+        searchMRUList->Push(data);
+    }
+    else if (type == MRUStringType::MRU_REPLACE && replaceMRUList)
+    {
+        replaceMRUList->Push(data);
+    }
+}
+
+std::pair<std::wstring, bool> CSettings::Next(MRUStringType type)
+{
+    if (type == MRUStringType::MRU_SEARCH && searchMRUList)
+    {
+        return searchMRUList->Next();
+    }
+    else if (type == MRUStringType::MRU_REPLACE && replaceMRUList)
+    {
+        return replaceMRUList->Next();
+    }
+    return { std::wstring{}, false };
+}
+
+void CSettings::ResetMRUList(MRUStringType type)
+{
+    if (type == MRUStringType::MRU_SEARCH && searchMRUList)
+    {
+        searchMRUList->Reset();
+    }
+    else if (type == MRUStringType::MRU_REPLACE && replaceMRUList)
+    {
+        replaceMRUList->Reset();
+    }
 }
 
 void CSettings::LoadPowerRenameData()
@@ -411,6 +273,24 @@ void CSettings::SavePowerRenameData() const
     jsonData.SetNamedValue(c_flags,                   json::value(settings.flags));
     jsonData.SetNamedValue(c_searchText,              json::value(settings.searchText));
     jsonData.SetNamedValue(c_replaceText,             json::value(settings.replaceText));
+
+    if (settings.MRUEnabled)
+    {
+        if (searchMRUList)
+        {
+            searchMRUList->Reset();
+            json::JsonArray searchMRU{};
+
+            jsonData.SetNamedValue(c_mruSearchRegPath, searchMRU);
+        }
+        if (replaceMRUList)
+        {
+            replaceMRUList->Reset();
+            json::JsonArray replaceMRU{};
+
+            jsonData.SetNamedValue(c_mruReplaceRegPath, replaceMRU);
+        }
+    }
 
     json::to_file(jsonFilePath, jsonData);
 }
@@ -480,10 +360,48 @@ CSettings& CSettingsInstance()
 
 HRESULT CRenameMRUSearch_CreateInstance(_Outptr_ IUnknown** ppUnk)
 {
-    return CRenameMRU::CreateInstance(c_mruSearchRegPath, CSettingsInstance().GetMaxMRUSize(), ppUnk);
+    return CRenameMRU::CreateInstance(CSettings::MRUStringType::MRU_SEARCH, ppUnk);
 }
 
 HRESULT CRenameMRUReplace_CreateInstance(_Outptr_ IUnknown** ppUnk)
 {
-    return CRenameMRU::CreateInstance(c_mruReplaceRegPath, CSettingsInstance().GetMaxMRUSize(), ppUnk);
+    return CRenameMRU::CreateInstance(CSettings::MRUStringType::MRU_REPLACE, ppUnk);
+}
+
+void CSettings::MRUList::Push(const std::wstring& item)
+{
+    if (Exists(item))
+    {
+        return;
+    }
+    // TODO: Limit maximum capacity of items list in order to stop infinite grow.
+    items.push_back(item);
+    if (++pushIdx >= size)
+    {
+        consumeIdx = start = (pushIdx - size);
+    }
+}
+
+std::pair<std::wstring, bool> CSettings::MRUList::Next()
+{
+    if (consumeIdx < start + size)
+    {
+        return { items[consumeIdx++], true };
+    }
+    return { std::wstring{}, false };
+}
+
+void CSettings::MRUList::Resize(int size)
+{
+    this->size = size;
+}
+
+void CSettings::MRUList::Reset()
+{
+    consumeIdx = start;
+}
+
+bool CSettings::MRUList::Exists(const std::wstring& item)
+{
+    return std::find(std::begin(items), std::end(items), item) == std::end(items);
 }
