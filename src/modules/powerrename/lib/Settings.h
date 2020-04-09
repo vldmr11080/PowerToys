@@ -110,11 +110,11 @@ public:
     }
 
     void AddMRUString(const std::wstring& data, MRUStringType type);
-    std::pair<std::wstring, bool> Next(MRUStringType type);
+    bool NextMRUString(std::wstring& data, MRUStringType type);
     void ResetMRUList(MRUStringType type);
 
     void LoadPowerRenameData();
-    void SavePowerRenameData() const;
+    void SavePowerRenameData();
 
 private:
     struct Settings
@@ -133,29 +133,30 @@ private:
     {
     public:
         MRUList(int size) :
-            consumeIdx(0),
             pushIdx(0),
-            start(0),
+            nextIdx(1),
             size(size)
         {
-
+            items.resize(size);
         }
 
-        void Push(const std::wstring& item);
-        std::pair<std::wstring, bool> Next();
+        void Push(const std::wstring& data);
+        bool Next(std::wstring& data);
 
-        void Resize(int size);
+        void Resize(int newSize);
         void Reset();
 
     private:
-        bool Exists(const std::wstring& item);
+        bool Exists(const std::wstring& data);
 
         std::vector<std::wstring> items;
-        int consumeIdx; // index from which next element should be consumed
-        int pushIdx; // index on which new element should be added
-        int start; // starting index of sliding window
+        int pushIdx;
+        int nextIdx;
         int size;
     };
+
+    json::JsonArray SerializeSearchMRUList();
+    json::JsonArray SerializeReplaceMRUList();
 
     void MigrateSettingsFromRegistry();
     void MigrateSearchMRUList();
