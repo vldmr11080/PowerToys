@@ -193,6 +193,7 @@ CSettings::CSettings()
 {
     std::wstring result = PTSettingsHelper::get_module_save_folder_location(L"PowerRename");
     jsonFilePath = result + L"\\" + std::wstring(c_powerRenameDataFilePath);
+    LoadPowerRenameData();
 }
 
 bool CSettings::GetEnabled()
@@ -242,20 +243,6 @@ void CSettings::ResetMRUList(MRUStringType type)
     }
 }
 
-void CSettings::LoadPowerRenameData()
-{
-    if (!std::filesystem::exists(jsonFilePath))
-    {
-        MigrateSettingsFromRegistry();
-
-        SavePowerRenameData();
-    }
-    else
-    {
-        ParseJsonSettings();
-    }
-}
-
 void CSettings::SavePowerRenameData()
 {
     json::JsonObject jsonData;
@@ -282,6 +269,20 @@ void CSettings::SavePowerRenameData()
     }
 
     json::to_file(jsonFilePath, jsonData);
+}
+
+void CSettings::LoadPowerRenameData()
+{
+    if (!std::filesystem::exists(jsonFilePath))
+    {
+        MigrateSettingsFromRegistry();
+
+        SavePowerRenameData();
+    }
+    else
+    {
+        ParseJsonSettings();
+    }
 }
 
 json::JsonArray CSettings::SerializeSearchMRUList()
@@ -332,7 +333,6 @@ void CSettings::MigrateSearchMRUList()
     searchMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
     std::wstring searchListKeys = GetRegString(c_mruList, c_mruSearchRegPath);
     std::sort(std::begin(searchListKeys), std::end(searchListKeys));
-    int cnt = 0;
     for (const wchar_t& key : searchListKeys)
     {
         searchMRUList->Push(GetRegString(std::wstring(1, key), c_mruSearchRegPath));

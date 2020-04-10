@@ -283,7 +283,6 @@ public:
 
     void init_settings()
     {
-        CSettingsInstance().LoadPowerRenameData();
         m_enabled = CSettingsInstance().GetEnabled();
         Trace::EnablePowerRename(m_enabled);
     }

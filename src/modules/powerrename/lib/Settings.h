@@ -2,8 +2,6 @@
 
 #include "json.h"
 
-#include <string>
-
 class CSettings
 {
 public:
@@ -113,7 +111,6 @@ public:
     bool NextMRUString(std::wstring& data, MRUStringType type);
     void ResetMRUList(MRUStringType type);
 
-    void LoadPowerRenameData();
     void SavePowerRenameData();
 
 private:
@@ -154,6 +151,8 @@ private:
         int nextIdx;
         int size;
     };
+
+    void LoadPowerRenameData();
 
     json::JsonArray SerializeSearchMRUList();
     json::JsonArray SerializeReplaceMRUList();
