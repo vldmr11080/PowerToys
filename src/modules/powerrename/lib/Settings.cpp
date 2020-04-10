@@ -324,8 +324,12 @@ void CSettings::MigrateSettingsFromRegistry()
     settings.searchText              = GetRegString(c_searchText, L"");
     settings.replaceText             = GetRegString(c_replaceText, L"");
 
-    MigrateSearchMRUList();
-    MigrateReplaceMRUList();
+    if (settings.MRUEnabled)
+    {
+        InitMRULists();
+        MigrateSearchMRUList();
+        MigrateReplaceMRUList();
+    }
 }
 
 void CSettings::MigrateSearchMRUList()
@@ -390,27 +394,35 @@ void CSettings::ParseJsonSettings()
             {
                 settings.replaceText = jsonSettings.GetNamedString(c_replaceText);
             }
-            if (json::has(jsonSettings, c_mruSearchList, json::JsonValueType::Array))
+            if (settings.MRUEnabled)
             {
-                searchMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
-                auto searchList = jsonSettings.GetNamedArray(c_mruSearchList);
-                for (uint32_t i = 0; i < searchList.Size(); ++i)
+                InitMRULists();
+                if (json::has(jsonSettings, c_mruSearchList, json::JsonValueType::Array))
                 {
-                    searchMRUList->Push(std::wstring(searchList.GetStringAt(i)));
+                    auto searchList = jsonSettings.GetNamedArray(c_mruSearchList);
+                    for (uint32_t i = 0; i < searchList.Size(); ++i)
+                    {
+                        searchMRUList->Push(std::wstring(searchList.GetStringAt(i)));
+                    }
                 }
-            }
-            if (json::has(jsonSettings, c_mruReplaceList, json::JsonValueType::Array))
-            {
-                replaceMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
-                auto replaceList = jsonSettings.GetNamedArray(c_mruReplaceList);
-                for (uint32_t i = 0; i < replaceList.Size(); ++i)
+                if (json::has(jsonSettings, c_mruReplaceList, json::JsonValueType::Array))
                 {
-                    replaceMRUList->Push(std::wstring(replaceList.GetStringAt(i)));
+                    auto replaceList = jsonSettings.GetNamedArray(c_mruReplaceList);
+                    for (uint32_t i = 0; i < replaceList.Size(); ++i)
+                    {
+                        replaceMRUList->Push(std::wstring(replaceList.GetStringAt(i)));
+                    }
                 }
             }
         }
         catch (const winrt::hresult_error&) { }
     }
+}
+
+void CSettings::InitMRULists()
+{
+    searchMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
+    replaceMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
 }
 
 CSettings& CSettingsInstance()

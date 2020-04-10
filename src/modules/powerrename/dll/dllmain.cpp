@@ -278,6 +278,7 @@ public:
     // Destroy the powertoy and free memory
     virtual void destroy() override
     {
+        CSettingsInstance().SavePowerRenameData();
         delete this;
     }
 

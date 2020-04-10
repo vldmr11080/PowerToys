@@ -163,6 +163,8 @@ private:
 
     void ParseJsonSettings();
 
+    void InitMRULists();
+
     Settings settings;
     std::wstring jsonFilePath;
 
