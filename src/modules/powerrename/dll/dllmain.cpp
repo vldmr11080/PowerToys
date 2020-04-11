@@ -250,7 +250,7 @@ public:
             CSettingsInstance().SetMaxMRUSize(values.get_int_value(L"int_max_mru_size").value());
             CSettingsInstance().SetShowIconOnMenu(values.get_bool_value(L"bool_show_icon_on_menu").value());
             CSettingsInstance().SetExtendedContextMenuOnly(values.get_bool_value(L"bool_show_extended_menu").value());
-            CSettingsInstance().SavePowerRenameData();
+            CSettingsInstance().Save();
 
             Trace::SettingsChanged();
         }
@@ -278,7 +278,6 @@ public:
     // Destroy the powertoy and free memory
     virtual void destroy() override
     {
-        CSettingsInstance().SavePowerRenameData();
         delete this;
     }
 
@@ -291,7 +290,7 @@ public:
     void save_settings()
     {
         CSettingsInstance().SetEnabled(m_enabled);
-        CSettingsInstance().SavePowerRenameData();
+        CSettingsInstance().Save();
         Trace::EnablePowerRename(m_enabled);
     }
 

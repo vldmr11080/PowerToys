@@ -7,20 +7,22 @@ class CSettings
 public:
     static const int MAX_INPUT_STRING_LEN = 1024;
 
-    enum class MRUStringType
-    {
-        MRU_SEARCH,
-        MRU_REPLACE
-    };
-
     CSettings();
 
-    bool GetEnabled();
-
-    void SetEnabled(bool enabled);
-
-    inline bool GetShowIconOnMenu() const
+    inline bool GetEnabled()
     {
+        Reload();
+        return settings.enabled;
+    }
+
+    inline void SetEnabled(bool enabled)
+    {
+        settings.enabled = enabled;
+    }
+
+    inline bool GetShowIconOnMenu()
+    {
+        Reload();
         return settings.showIconOnMenu;
     }
 
@@ -29,8 +31,9 @@ public:
         settings.showIconOnMenu = show;
     }
 
-    inline bool GetExtendedContextMenuOnly() const
+    inline bool GetExtendedContextMenuOnly()
     {
+        Reload();
         return settings.extendedContextMenuOnly;
     }
 
@@ -39,8 +42,9 @@ public:
         settings.extendedContextMenuOnly = extendedOnly;
     }
 
-    inline bool GetPersistState() const
+    inline bool GetPersistState()
     {
+        Reload();
         return settings.persistState;
     }
 
@@ -49,8 +53,9 @@ public:
         settings.persistState = persistState;
     }
 
-    inline bool GetMRUEnabled() const
+    inline bool GetMRUEnabled()
     {
+        Reload();
         return settings.MRUEnabled;
     }
 
@@ -59,63 +64,59 @@ public:
         settings.MRUEnabled = MRUEnabled;
     }
 
-    inline long GetMaxMRUSize() const
+    inline long GetMaxMRUSize()
     {
+        Reload();
         return settings.maxMRUSize;
     }
 
     inline void SetMaxMRUSize(long maxMRUSize)
     {
         settings.maxMRUSize = maxMRUSize;
-        if (searchMRUList)
-        {
-            searchMRUList->Resize(maxMRUSize);
-        }
-        if (replaceMRUList)
-        {
-            replaceMRUList->Resize(maxMRUSize);
-        }
     }
 
-    inline long GetFlags() const
+    inline long GetFlags()
     {
+        Reload();
         return settings.flags;
     }
 
     inline void SetFlags(long flags)
     {
         settings.flags = flags;
+        Save();
     }
 
-    inline const std::wstring& GetSearchText() const
+    inline const std::wstring& GetSearchText()
     {
+        Reload();
         return settings.searchText;
     }
 
     inline void SetSearchText(const std::wstring& text)
     {
         settings.searchText = text;
+        Save();
     }
 
-    inline const std::wstring& GetReplaceText() const
+    inline const std::wstring& GetReplaceText()
     {
+        Reload();
         return settings.replaceText;
     }
 
     inline void SetReplaceText(const std::wstring& text)
     {
         settings.replaceText = text;
+        Save();
     }
 
-    void AddMRUString(const std::wstring& data, MRUStringType type);
-    bool NextMRUString(std::wstring& data, MRUStringType type);
-    void ResetMRUList(MRUStringType type);
-
-    void SavePowerRenameData();
+    void Save();
 
 private:
     struct Settings
     {
+        bool enabled{ true };
         bool showIconOnMenu{ true };
         bool extendedContextMenuOnly{ false }; // Disabled by default.
         bool persistState{ true };
@@ -126,50 +127,13 @@ private:
         std::wstring replaceText{};
     };
 
-    class MRUList
-    {
-    public:
-        MRUList(int size) :
-            pushIdx(0),
-            nextIdx(1),
-            size(size)
-        {
-            items.resize(size);
-        }
-
-        void Push(const std::wstring& data);
-        bool Next(std::wstring& data);
-
-        void Resize(int newSize);
-        void Reset();
-
-    private:
-        bool Exists(const std::wstring& data);
-
-        std::vector<std::wstring> items;
-        int pushIdx;
-        int nextIdx;
-        int size;
-    };
-
-    void LoadPowerRenameData();
-
-    json::JsonArray SerializeSearchMRUList();
-    json::JsonArray SerializeReplaceMRUList();
-
-    void MigrateSettingsFromRegistry();
-    void MigrateSearchMRUList();
-    void MigrateReplaceMRUList();
-
-    void ParseJsonSettings();
-
-    void InitMRULists();
+    void Load();
+    void Reload();
+    void MigrateFromRegistry();
+    void ParseJson();
 
     Settings settings;
     std::wstring jsonFilePath;
-
-    std::unique_ptr<MRUList> searchMRUList{ nullptr };
-    std::unique_ptr<MRUList> replaceMRUList{ nullptr };
 };
 
 CSettings& CSettingsInstance();

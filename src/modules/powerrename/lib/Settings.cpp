@@ -10,6 +10,8 @@
 namespace
 {
     const wchar_t c_powerRenameDataFilePath[] = L"power-rename-settings.json";
+    const wchar_t c_searchMRUListFilePath[] = L"search-mru.json";
+    const wchar_t c_replaceMRUListFilePath[] = L"replace-mru.json";
 
     const wchar_t c_rootRegPath[] = L"Software\\Microsoft\\PowerRename";
     const wchar_t c_mruSearchRegPath[] = L"\\SearchMRU";
@@ -25,8 +27,7 @@ namespace
     const wchar_t c_replaceText[] = L"ReplaceText";
     const wchar_t c_mruEnabled[] = L"MRUEnabled";
     const wchar_t c_mruList[] = L"MRUList";
-    const wchar_t c_mruSearchList[] = L"MRUSearchList";
-    const wchar_t c_mruReplaceList[] = L"MRUReplaceList";
+    const wchar_t c_insertionIdx[] = L"InsertionIdx";
 
     long GetRegNumber(const std::wstring& valueName, long defaultValue)
     {
@@ -68,6 +69,169 @@ namespace
     }
 }
 
+class MRUListHandler
+{
+public:
+    MRUListHandler(int size, const std::wstring& path) :
+        pushIdx(0),
+        nextIdx(1),
+        size(size)
+    {
+        items.resize(size);
+        std::wstring result = PTSettingsHelper::get_module_save_folder_location(L"PowerRename");
+        jsonFilePath = result + L"\\" + path;
+        Load();
+    }
+
+    void Push(const std::wstring& data);
+    bool Next(std::wstring& data);
+
+    void Reset();
+
+private:
+    void Load();
+    void Save();
+    void MigrateFromRegistry();
+    json::JsonArray Serialize();
+    void ParseJson();
+
+    bool Exists(const std::wstring& data);
+
+    std::vector<std::wstring> items;
+    long pushIdx;
+    long nextIdx;
+    long size;
+    std::wstring jsonFilePath;
+};
+
+
+void MRUListHandler::Push(const std::wstring& data)
+{
+    if (Exists(data))
+    {
+        // TODO: Already existing item should be put on top of MRU list.
+        return;
+    }
+    items[pushIdx] = data;
+    pushIdx = (pushIdx + 1) % size;
+    Save();
+}
+
+bool MRUListHandler::Next(std::wstring& data)
+{
+    if (nextIdx == size + 1)
+    {
+        Reset();
+        return false;
+    }
+    // Go backwards to consume latest items first.
+    long idx = (pushIdx + size - nextIdx) % size;
+    if (items[idx].empty())
+    {
+        Reset();
+        return false;
+    }
+    data = items[idx];
+    ++nextIdx;
+    return true;
+}
+
+void MRUListHandler::Reset()
+{
+    nextIdx = 1;
+}
+
+void MRUListHandler::Load()
+{
+    if (!std::filesystem::exists(jsonFilePath))
+    {
+        MigrateFromRegistry();
+
+        Save();
+    }
+    else
+    {
+        ParseJson();
+    }
+}
+
+void MRUListHandler::Save()
+{
+    json::JsonObject jsonData;
+
+    jsonData.SetNamedValue(c_maxMRUSize, json::value(size));
+    jsonData.SetNamedValue(c_mruList, Serialize());
+    jsonData.SetNamedValue(c_insertionIdx, json::value(pushIdx));
+
+    json::to_file(jsonFilePath, jsonData);
+}
+
+json::JsonArray MRUListHandler::Serialize()
+{
+    json::JsonArray searchMRU{};
+
+    std::wstring data{};
+    while (Next(data))
+    {
+        searchMRU.Append(json::value(data));
+    }
+    Reset();
+
+    return searchMRU;
+}
+
+void MRUListHandler::MigrateFromRegistry()
+{
+    std::wstring searchListKeys = GetRegString(c_mruList, c_mruSearchRegPath);
+    std::sort(std::begin(searchListKeys), std::end(searchListKeys));
+    for (const wchar_t& key : searchListKeys)
+    {
+        Push(GetRegString(std::wstring(1, key), c_mruSearchRegPath));
+    }
+}
+
+void MRUListHandler::ParseJson()
+{
+    auto json = json::from_file(jsonFilePath);
+    if (json)
+    {
+        const json::JsonObject& jsonObject = json.value();
+        try
+        {
+            if (json::has(jsonObject, c_mruList, json::JsonValueType::Array))
+            {
+                auto searchList = jsonObject.GetNamedArray(c_mruList);
+                for (uint32_t i = 0; i < searchList.Size(); ++i)
+                {
+                    Push(std::wstring(searchList.GetStringAt(i)));
+                }
+            }
+            if (json::has(jsonObject, c_maxMRUSize, json::JsonValueType::Number))
+            {
+                long oldSize = (long)jsonObject.GetNamedNumber(c_maxMRUSize);
+                if (oldSize == size)
+                {
+                    // Load insertion index if size remained the same.
+                    if (json::has(jsonObject, c_insertionIdx, json::JsonValueType::Number))
+                    {
+                        pushIdx = (long)jsonObject.GetNamedNumber(c_insertionIdx);
+                    }
+                }
+                else
+                {
+                    Save();
+                }
+            }
+        }
+        catch (const winrt::hresult_error&) { }
+    }
+}
+
+bool MRUListHandler::Exists(const std::wstring& data)
+{
+    return std::find(std::begin(items), std::end(items), data) != std::end(items);
+}
+
 class CRenameMRU :
     public IEnumString,
     public IPowerRenameMRU
@@ -87,26 +251,29 @@ public:
     // IPowerRenameMRU
     IFACEMETHODIMP AddMRUString(_In_ PCWSTR entry);
 
-    static HRESULT CreateInstance(_In_ CSettings::MRUStringType type, _Outptr_ IUnknown** ppUnk);
+    static HRESULT CreateInstance(_In_ const std::wstring& path, _Outptr_ IUnknown** ppUnk);
 
 private:
-    CRenameMRU(CSettings::MRUStringType type);
+    CRenameMRU(int size, const std::wstring& path);
 
-    CSettings::MRUStringType MRUType;
+    std::unique_ptr<MRUListHandler> mruList;
     long refCount = 0;
 };
 
-CRenameMRU::CRenameMRU(CSettings::MRUStringType type) :
-    MRUType(type),
-    refCount(1) {}
+CRenameMRU::CRenameMRU(int size, const std::wstring& path) :
+    refCount(1)
+{
+    mruList = std::make_unique<MRUListHandler>(size, path);
+}
 
-HRESULT CRenameMRU::CreateInstance(_In_ CSettings::MRUStringType type, _Outptr_ IUnknown** ppUnk)
+HRESULT CRenameMRU::CreateInstance(_In_ const std::wstring& path, _Outptr_ IUnknown** ppUnk)
 {
     *ppUnk = nullptr;
-    HRESULT hr = CSettingsInstance().GetMaxMRUSize() > 0 ? S_OK : E_FAIL;
+    long maxMRUSize = CSettingsInstance().GetMaxMRUSize();
+    HRESULT hr = maxMRUSize > 0 ? S_OK : E_FAIL;
     if (SUCCEEDED(hr))
     {
-        CRenameMRU* renameMRU = new CRenameMRU(type);
+        CRenameMRU* renameMRU = new CRenameMRU(maxMRUSize, path);
         hr = renameMRU ? S_OK : E_OUTOFMEMORY;
         if (SUCCEEDED(hr))
         {
@@ -118,7 +285,6 @@ HRESULT CRenameMRU::CreateInstance(_In_ CSettings::MRUStringType type, _Outptr_ 
     return hr;
 }
 
-// IUnknown
 IFACEMETHODIMP_(ULONG) CRenameMRU::AddRef()
 {
     return InterlockedIncrement(&refCount);
@@ -145,14 +311,6 @@ IFACEMETHODIMP CRenameMRU::QueryInterface(_In_ REFIID riid, _Outptr_ void** ppv)
     return QISearch(this, qit, riid, ppv);
 }
 
-
-// IEnumString
-IFACEMETHODIMP CRenameMRU::Reset()
-{
-    CSettingsInstance().ResetMRUList(MRUType);
-    return S_OK;
-}
-
 IFACEMETHODIMP CRenameMRU::Next(__in ULONG celt, __out_ecount_part(celt, *pceltFetched) LPOLESTR* rgelt, __out_opt ULONG* pceltFetched)
 {
     if (pceltFetched)
@@ -171,7 +329,7 @@ IFACEMETHODIMP CRenameMRU::Next(__in ULONG celt, __out_ecount_part(celt, *pceltF
     }
 
     HRESULT hr = S_FALSE;
-    if (std::wstring data{}; CSettingsInstance().NextMRUString(data, MRUType))
+    if (std::wstring data{}; mruList->Next(data))
     {
         hr = SHStrDup(data.c_str(), rgelt);
         if (SUCCEEDED(hr) && pceltFetched != nullptr)
@@ -183,9 +341,15 @@ IFACEMETHODIMP CRenameMRU::Next(__in ULONG celt, __out_ecount_part(celt, *pceltF
     return hr;
 }
 
+IFACEMETHODIMP CRenameMRU::Reset()
+{
+    mruList->Reset();
+    return S_OK;
+}
+
 IFACEMETHODIMP CRenameMRU::AddMRUString(_In_ PCWSTR entry)
 {
-    CSettingsInstance().AddMRUString(entry, MRUType);
+    mruList->Push(entry);
     return S_OK;
 }
 
@@ -193,60 +357,33 @@ CSettings::CSettings()
 {
     std::wstring result = PTSettingsHelper::get_module_save_folder_location(L"PowerRename");
     jsonFilePath = result + L"\\" + std::wstring(c_powerRenameDataFilePath);
-    LoadPowerRenameData();
+    Load();
 }
 
-bool CSettings::GetEnabled()
+void CSettings::Load()
 {
-    return GetRegBoolean(c_enabled, true);
+    if (!std::filesystem::exists(jsonFilePath))
+    {
+        MigrateFromRegistry();
+
+        Save();
+    }
+    else
+    {
+        ParseJson();
+    }
 }
 
-void CSettings::SetEnabled(bool enabled)
+void CSettings::Reload()
 {
-    SetRegBoolean(c_enabled, enabled);
+    Load();
 }
 
-void CSettings::AddMRUString(const std::wstring& data, MRUStringType type)
-{
-    if (type == MRUStringType::MRU_SEARCH && searchMRUList)
-    {
-        searchMRUList->Push(data);
-    }
-    else if (type == MRUStringType::MRU_REPLACE && replaceMRUList)
-    {
-        replaceMRUList->Push(data);
-    }
-}
-
-bool CSettings::NextMRUString(std::wstring& data, MRUStringType type)
-{
-    if (type == MRUStringType::MRU_SEARCH && searchMRUList)
-    {
-        return searchMRUList->Next(data);
-    }
-    else if (type == MRUStringType::MRU_REPLACE && replaceMRUList)
-    {
-        return replaceMRUList->Next(data);
-    }
-    return false;
-}
-
-void CSettings::ResetMRUList(MRUStringType type)
-{
-    if (type == MRUStringType::MRU_SEARCH && searchMRUList)
-    {
-        searchMRUList->Reset();
-    }
-    else if (type == MRUStringType::MRU_REPLACE && replaceMRUList)
-    {
-        replaceMRUList->Reset();
-    }
-}
-
-void CSettings::SavePowerRenameData()
+void CSettings::Save()
 {
     json::JsonObject jsonData;
 
+    jsonData.SetNamedValue(c_enabled,                 json::value(settings.enabled));
     jsonData.SetNamedValue(c_showIconOnMenu,          json::value(settings.showIconOnMenu));
     jsonData.SetNamedValue(c_extendedContextMenuOnly, json::value(settings.extendedContextMenuOnly));
     jsonData.SetNamedValue(c_persistState,            json::value(settings.persistState));
@@ -256,65 +393,12 @@ void CSettings::SavePowerRenameData()
     jsonData.SetNamedValue(c_searchText,              json::value(settings.searchText));
     jsonData.SetNamedValue(c_replaceText,             json::value(settings.replaceText));
 
-    if (settings.MRUEnabled)
-    {
-        if (searchMRUList)
-        {
-            jsonData.SetNamedValue(c_mruSearchList, SerializeSearchMRUList());
-        }
-        if (replaceMRUList)
-        {
-            jsonData.SetNamedValue(c_mruReplaceList, SerializeReplaceMRUList());
-        }
-    }
-
     json::to_file(jsonFilePath, jsonData);
 }
 
-void CSettings::LoadPowerRenameData()
+void CSettings::MigrateFromRegistry()
 {
-    if (!std::filesystem::exists(jsonFilePath))
-    {
-        MigrateSettingsFromRegistry();
-
-        SavePowerRenameData();
-    }
-    else
-    {
-        ParseJsonSettings();
-    }
-}
-
-json::JsonArray CSettings::SerializeSearchMRUList()
-{
-    json::JsonArray searchMRU{};
-
-    std::wstring data{};
-    while (searchMRUList->Next(data))
-    {
-        searchMRU.Append(json::value(data));
-    }
-    searchMRUList->Reset();
-
-    return searchMRU;
-}
-
-json::JsonArray CSettings::SerializeReplaceMRUList()
-{
-    json::JsonArray replaceMRU{};
-
-    std::wstring data{};
-    while (replaceMRUList->Next(data))
-    {
-        replaceMRU.Append(json::value(data));
-    }
-    replaceMRUList->Reset();
-
-    return replaceMRU;
-}
-
-void CSettings::MigrateSettingsFromRegistry()
-{
+    settings.enabled                 = GetRegBoolean(c_enabled, true);
     settings.showIconOnMenu          = GetRegBoolean(c_showIconOnMenu, true);
     settings.extendedContextMenuOnly = GetRegBoolean(c_extendedContextMenuOnly, false); // Disabled by default.
     settings.persistState            = GetRegBoolean(c_persistState, true);
@@ -323,38 +407,9 @@ void CSettings::MigrateSettingsFromRegistry()
     settings.flags                   = GetRegNumber(c_flags, 0);
     settings.searchText              = GetRegString(c_searchText, L"");
     settings.replaceText             = GetRegString(c_replaceText, L"");
-
-    if (settings.MRUEnabled)
-    {
-        InitMRULists();
-        MigrateSearchMRUList();
-        MigrateReplaceMRUList();
-    }
 }
 
-void CSettings::MigrateSearchMRUList()
-{
-    searchMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
-    std::wstring searchListKeys = GetRegString(c_mruList, c_mruSearchRegPath);
-    std::sort(std::begin(searchListKeys), std::end(searchListKeys));
-    for (const wchar_t& key : searchListKeys)
-    {
-        searchMRUList->Push(GetRegString(std::wstring(1, key), c_mruSearchRegPath));
-    }
-}
-
-void CSettings::MigrateReplaceMRUList()
-{
-    replaceMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
-    std::wstring replaceListKeys = GetRegString(c_mruList, c_mruReplaceRegPath);
-    std::sort(std::begin(replaceListKeys), std::end(replaceListKeys));
-    for (const wchar_t& key : replaceListKeys)
-    {
-        replaceMRUList->Push(GetRegString(std::wstring(1, key), c_mruReplaceRegPath));
-    }
-}
-
-void CSettings::ParseJsonSettings()
+void CSettings::ParseJson()
 {
     auto json = json::from_file(jsonFilePath);
     if (json)
@@ -362,6 +417,10 @@ void CSettings::ParseJsonSettings()
         const json::JsonObject& jsonSettings = json.value();
         try
         {
+            if (json::has(jsonSettings, c_enabled, json::JsonValueType::Boolean))
+            {
+                settings.enabled = jsonSettings.GetNamedBoolean(c_enabled);
+            }
             if (json::has(jsonSettings, c_showIconOnMenu, json::JsonValueType::Boolean))
             {
                 settings.showIconOnMenu = jsonSettings.GetNamedBoolean(c_showIconOnMenu);
@@ -394,35 +453,9 @@ void CSettings::ParseJsonSettings()
             {
                 settings.replaceText = jsonSettings.GetNamedString(c_replaceText);
             }
-            if (settings.MRUEnabled)
-            {
-                InitMRULists();
-                if (json::has(jsonSettings, c_mruSearchList, json::JsonValueType::Array))
-                {
-                    auto searchList = jsonSettings.GetNamedArray(c_mruSearchList);
-                    for (uint32_t i = 0; i < searchList.Size(); ++i)
-                    {
-                        searchMRUList->Push(std::wstring(searchList.GetStringAt(i)));
-                    }
-                }
-                if (json::has(jsonSettings, c_mruReplaceList, json::JsonValueType::Array))
-                {
-                    auto replaceList = jsonSettings.GetNamedArray(c_mruReplaceList);
-                    for (uint32_t i = 0; i < replaceList.Size(); ++i)
-                    {
-                        replaceMRUList->Push(std::wstring(replaceList.GetStringAt(i)));
-                    }
-                }
-            }
         }
         catch (const winrt::hresult_error&) { }
     }
-}
-
-void CSettings::InitMRULists()
-{
-    searchMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
-    replaceMRUList = std::make_unique<MRUList>(settings.maxMRUSize);
 }
 
 CSettings& CSettingsInstance()
@@ -433,74 +466,11 @@ CSettings& CSettingsInstance()
 
 HRESULT CRenameMRUSearch_CreateInstance(_Outptr_ IUnknown** ppUnk)
 {
-    return CRenameMRU::CreateInstance(CSettings::MRUStringType::MRU_SEARCH, ppUnk);
+    return CRenameMRU::CreateInstance(c_searchMRUListFilePath, ppUnk);
 }
 
 HRESULT CRenameMRUReplace_CreateInstance(_Outptr_ IUnknown** ppUnk)
 {
-    return CRenameMRU::CreateInstance(CSettings::MRUStringType::MRU_REPLACE, ppUnk);
+    return CRenameMRU::CreateInstance(c_replaceMRUListFilePath, ppUnk);
 }
 
-void CSettings::MRUList::Push(const std::wstring& data)
-{
-    if (Exists(data))
-    {
-        // TODO: Already existing item should be put on top of MRU list.
-        return;
-    }
-    items[pushIdx] = data;
-    pushIdx = (pushIdx + 1) % size;
-}
-
-bool CSettings::MRUList::Next(std::wstring& data)
-{
-    if (nextIdx == size + 1)
-    {
-        Reset();
-        return false;
-    }
-    // Go backwards to consume latest items first.
-    int idx = (pushIdx + size - nextIdx) % size;
-    if (items[idx].empty())
-    {
-        Reset();
-        return false;
-    }
-    data = items[idx];
-    ++nextIdx;
-    return true;
-}
-
-void CSettings::MRUList::Resize(int newSize)
-{
-    if (newSize < size)
-    {
-        // Size of most recently used items list is reduced. Take only latest ones.
-        std::vector<std::wstring> temp;
-        temp.reserve(newSize);
-        std::wstring data{};
-        for (size_t i = 0; i < newSize && Next(data); ++i)
-        {
-            temp.push_back(data);
-        }
-        pushIdx = temp.size() % newSize;
-        std::reverse(std::begin(temp), std::end(temp));
-        items = std::move(temp);
-    }
-    else
-    {
-        items.resize(newSize);
-    }
-    size = newSize;
-    Reset();
-}
-
-void CSettings::MRUList::Reset()
-{
-    nextIdx = 1;
-}
-
-bool CSettings::MRUList::Exists(const std::wstring& data)
-{
-    return std::find(std::begin(items), std::end(items), data) != std::end(items);
-}
