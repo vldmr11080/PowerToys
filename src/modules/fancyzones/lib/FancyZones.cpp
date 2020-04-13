@@ -345,14 +345,69 @@ FancyZones::VirtualDesktopInitialize() noexcept
     PostMessage(m_window, WM_PRIV_VDINIT, 0, 0);
 }
 
+const CLSID CLSID_ImmersiveShell = {
+    0xC2F03A33,
+    0x21F5,
+    0x47FA,
+    0xB4,
+    0xBB,
+    0x15,
+    0x63,
+    0x62,
+    0xA2,
+    0xF2,
+    0x39
+};
+
+GUID GetWindowDesktopId(HWND window)
+{
+    IServiceProvider* pServiceProvider = NULL;
+    HRESULT hr = ::CoCreateInstance(
+        CLSID_ImmersiveShell, NULL, CLSCTX_LOCAL_SERVER, __uuidof(IServiceProvider), (PVOID*)&pServiceProvider);
+
+    if (SUCCEEDED(hr))
+    {
+        IVirtualDesktopManager* pDesktopManager = NULL;
+        hr = pServiceProvider->QueryService(__uuidof(IVirtualDesktopManager), &pDesktopManager);
+
+        if (SUCCEEDED(hr))
+        {
+            GUID guid{};
+            hr = pDesktopManager->GetWindowDesktopId(window, &guid);
+            if (SUCCEEDED(hr))
+            {
+                return guid;
+            }
+            pDesktopManager->Release();
+        }
+        pServiceProvider->Release();
+    }
+    return GUID{};
+}
+
+std::wstring ExtractVirtualDesktopId(const std::wstring& deviceId)
+{
+    // Format: <device-id>_<resolution>_<virtual-desktop-id>
+    return deviceId.substr(deviceId.rfind('_') + 1);
+}
+
 // IFancyZonesCallback
 IFACEMETHODIMP_(void)
 FancyZones::WindowCreated(HWND window) noexcept
 {
+    std::shared_lock readLock(m_lock);
     if (m_settings->GetSettings()->appLastZone_moveWindows && IsInterestingWindow(window))
     {
         for (const auto& [monitor, zoneWindow] : m_zoneWindowMap)
         {
+            std::wstring zoneWindowVD = ExtractVirtualDesktopId(zoneWindow->UniqueId());
+            GUID id{};
+            if (SUCCEEDED_LOG(CLSIDFromString(zoneWindowVD.c_str(), &id)) &&
+                id != GetWindowDesktopId(window))
+            {
+                return;
+            }
+
             const auto activeZoneSet = zoneWindow->ActiveZoneSet();
             if (activeZoneSet)
             {
