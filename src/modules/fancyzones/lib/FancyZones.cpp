@@ -191,7 +191,7 @@ private:
     bool OnSnapHotkey(DWORD vkCode) noexcept;
     
     void HandleVirtualDesktopUpdates(HANDLE fancyZonesDestroyedEvent) noexcept;
-    void RegisterVirtualDesktopUpdates(std::unordered_set<GUID>& currentVirtualDesktopIds) noexcept;
+    void RegisterVirtualDesktopUpdates(std::vector<GUID>& ids) noexcept;
     void RegisterNewWorkArea(GUID virtualDesktopId, HMONITOR monitor) noexcept;
     bool IsNewWorkArea(GUID virtualDesktopId, HMONITOR monitor) noexcept;
 
@@ -587,8 +587,7 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
             std::vector<GUID> ids{};
             if (VirtualDesktopUtils::GetVirtualDekstopIds(ids))
             {
-                std::unordered_set<GUID> idSet(std::begin(ids), std::end(ids));
-                RegisterVirtualDesktopUpdates(idSet);
+                RegisterVirtualDesktopUpdates(ids);
             }
 
         }
@@ -607,9 +606,11 @@ void FancyZones::OnDisplayChange(DisplayChangeType changeType) noexcept
     if (changeType == DisplayChangeType::VirtualDesktop ||
         changeType == DisplayChangeType::Initialization)
     {
-        if (VirtualDesktopUtils::GetCurrentVirtualDesktopId(&m_currentVirtualDesktopId))
+        GUID currentVirtualDesktopId{};
+        if (VirtualDesktopUtils::GetCurrentVirtualDesktopId(&currentVirtualDesktopId))
         {
             std::unique_lock writeLock(m_lock);
+            m_currentVirtualDesktopId = currentVirtualDesktopId;
             wil::unique_cotaskmem_string id;
             if (changeType == DisplayChangeType::Initialization &&
                 SUCCEEDED_LOG(StringFromCLSID(m_currentVirtualDesktopId, &id)))
@@ -840,14 +841,15 @@ void FancyZones::HandleVirtualDesktopUpdates(HANDLE fancyZonesDestroyedEvent) no
     }
 }
 
-void FancyZones::RegisterVirtualDesktopUpdates(std::unordered_set<GUID>& currentVirtualDesktopIds) noexcept
+void FancyZones::RegisterVirtualDesktopUpdates(std::vector<GUID>& ids) noexcept
 {
     std::unique_lock writeLock(m_lock);
     bool modified{ false };
-    for (auto it = begin(m_processedWorkAreas); it != end(m_processedWorkAreas);)
+    std::unordered_set<GUID> activeVirtualDesktops(std::begin(ids), std::end(ids));
+    for (auto it = std::begin(m_processedWorkAreas); it != std::end(m_processedWorkAreas);)
     {
-        auto iter = currentVirtualDesktopIds.find(it->first);
-        if (iter == currentVirtualDesktopIds.end())
+        auto iter = activeVirtualDesktops.find(it->first);
+        if (iter == activeVirtualDesktops.end())
         {
             // if we couldn't find the GUID in currentVirtualDesktopIds, we must remove it from both m_processedWorkAreas and deviceInfoMap
             wil::unique_cotaskmem_string virtualDesktopId;
@@ -859,7 +861,7 @@ void FancyZones::RegisterVirtualDesktopUpdates(std::unordered_set<GUID>& current
         }
         else
         {
-            currentVirtualDesktopIds.erase(it->first); // virtual desktop already in map, skip it
+            activeVirtualDesktops.erase(it->first); // virtual desktop already in map, skip it
             ++it;
         }
     }
@@ -868,7 +870,7 @@ void FancyZones::RegisterVirtualDesktopUpdates(std::unordered_set<GUID>& current
         JSONHelpers::FancyZonesDataInstance().SaveFancyZonesData();
     }
     // register new virtual desktops, if any
-    for (const auto& id : currentVirtualDesktopIds)
+    for (const auto& id : activeVirtualDesktops)
     {
         m_processedWorkAreas[id] = std::vector<HMONITOR>();
     }
