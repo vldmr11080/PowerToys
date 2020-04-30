@@ -7,8 +7,9 @@ namespace VirtualDesktopUtils
     const CLSID CLSID_ImmersiveShell = { 0xC2F03A33, 0x21F5, 0x47FA, 0xB4, 0xBB, 0x15, 0x63, 0x62, 0xA2, 0xF2, 0x39 };
     const wchar_t GUID_EmptyGUID[] = L"{00000000-0000-0000-0000-000000000000}";
 
-    const wchar_t RegCurrentVirtualDesktop[] = L"CurrentVirtualDesktop";
-    const wchar_t RegVirtualDesktopIds[] = L"VirtualDesktopIDs";
+    const wchar_t RegNameCurrentVirtualDesktop[] = L"CurrentVirtualDesktop";
+    const wchar_t RegNameVirtualDesktopIds[] = L"VirtualDesktopIDs";
+    const wchar_t RegKeyVirtualDesktops[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VirtualDesktops";
 
     IServiceProvider* GetServiceProvider()
     {
@@ -50,7 +51,7 @@ namespace VirtualDesktopUtils
         return SUCCEEDED(CLSIDFromString(virtualDesktopId.c_str(), desktopId));
     }
 
-    bool GetCurrentVirtualDesktopId(GUID* desktopId)
+    bool GetDesktopIdFromCurrentSession(GUID* desktopId)
     {
         DWORD sessionId;
         ProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
@@ -68,7 +69,7 @@ namespace VirtualDesktopUtils
         if (RegOpenKeyExW(HKEY_CURRENT_USER, sessionKeyPath, 0, KEY_ALL_ACCESS, &key) == ERROR_SUCCESS)
         {
             DWORD size = sizeof(GUID);
-            if (RegQueryValueExW(key.get(), RegCurrentVirtualDesktop, 0, nullptr, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS)
+            if (RegQueryValueExW(key.get(), RegNameCurrentVirtualDesktop, 0, nullptr, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS)
             {
                 *desktopId = value;
                 return true;
@@ -77,17 +78,39 @@ namespace VirtualDesktopUtils
         return false;
     }
 
+    bool GetCurrentVirtualDesktopId(GUID* desktopId)
+    {
+        if (!GetDesktopIdFromCurrentSession(desktopId))
+        {
+            // Explorer persists current virtual desktop identifier to registry on a per session basis,
+            // but only after first virtual desktop switch happens. If the user hasn't switched virtual
+            // desktops (only primary desktop) in this session value in registry will be empty.
+            // If this value is empty take first element from array of virtual desktops (not kept per session).
+            std::vector<GUID> ids{};
+            if (!GetVirtualDekstopIds(ids) || ids.empty())
+            {
+                return false;
+            }
+            *desktopId = ids[0];
+        }
+        return true;
+    }
+
     bool GetVirtualDekstopIds(HKEY hKey, std::vector<GUID>& ids)
     {
+        if (!hKey)
+        {
+            return false;
+        }
         DWORD bufferCapacity;
         // request regkey binary buffer capacity only
-        if (RegQueryValueExW(hKey, RegVirtualDesktopIds, 0, nullptr, nullptr, &bufferCapacity) != ERROR_SUCCESS)
+        if (RegQueryValueExW(hKey, RegNameVirtualDesktopIds, 0, nullptr, nullptr, &bufferCapacity) != ERROR_SUCCESS)
         {
             return false;
         }
         std::unique_ptr<BYTE[]> buffer = std::make_unique<BYTE[]>(bufferCapacity);
         // request regkey binary content
-        if (RegQueryValueExW(hKey, RegVirtualDesktopIds, 0, nullptr, buffer.get(), &bufferCapacity) != ERROR_SUCCESS)
+        if (RegQueryValueExW(hKey, RegNameVirtualDesktopIds, 0, nullptr, buffer.get(), &bufferCapacity) != ERROR_SUCCESS)
         {
             return false;
         }
@@ -101,5 +124,35 @@ namespace VirtualDesktopUtils
         }
         ids = std::move(temp);
         return true;
+    }
+
+    bool GetVirtualDekstopIds(std::vector<GUID>& ids)
+    {
+        return GetVirtualDekstopIds(GetVirtualDesktopsRegKey(), ids);
+    }
+
+    HKEY OpenVirtualDesktopsRegKey()
+    {
+        HKEY hKey{ nullptr };
+        if (RegOpenKeyEx(HKEY_CURRENT_USER, RegKeyVirtualDesktops, 0, KEY_ALL_ACCESS, &hKey) == ERROR_SUCCESS)
+        {
+            return hKey;
+        }
+        return nullptr;
+    }
+
+    HKEY GetVirtualDesktopsRegKey()
+    {
+        static HKEY virtualDesktopsKey = OpenVirtualDesktopsRegKey();
+        return virtualDesktopsKey;
+    }
+
+    void CloseVirtualDesktopsRegKey()
+    {
+        HKEY hKey = GetVirtualDesktopsRegKey();
+        if (hKey)
+        {
+            RegCloseKey(hKey);
+        }
     }
 }

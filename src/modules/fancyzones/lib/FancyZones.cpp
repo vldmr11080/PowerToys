@@ -202,15 +202,13 @@ private:
 
     const HINSTANCE m_hinstance{};
 
-    HKEY m_virtualDesktopsRegKey{ nullptr };
-
     mutable std::shared_mutex m_lock;
     HWND m_window{};
     WindowMoveHandler m_windowMoveHandler;
     
     std::map<HMONITOR, winrt::com_ptr<IZoneWindow>> m_zoneWindowMap; // Map of monitor to ZoneWindow (one per monitor)
     winrt::com_ptr<IFancyZonesSettings> m_settings{};
-    GUID m_currentVirtualDesktopId{}; // UUID of the current virtual desktop. Is GUID_NULL until first VD switch per session.
+    GUID m_currentVirtualDesktopId{}; // GUID of the current virtual desktop.
     std::unordered_map<GUID, std::vector<HMONITOR>> m_processedWorkAreas; // Work area is defined by monitor and virtual desktop id.
     wil::unique_handle m_terminateEditorEvent; // Handle of FancyZonesEditor.exe we launch and wait on
     wil::unique_handle m_terminateVirtualDesktopTrackerEvent;
@@ -218,9 +216,10 @@ private:
     OnThreadExecutor m_dpiUnawareThread;
     OnThreadExecutor m_virtualDesktopTrackerThread;
 
-    static UINT WM_PRIV_VDCHANGED; // Message to get back on to the UI thread when virtual desktop changes
+    static UINT WM_PRIV_VDSWITCH; // Message to get back on to the UI thread when virtual desktop switch occurs
     static UINT WM_PRIV_VDINIT; // Message to get back to the UI thread when FancyZones are initialized
     static UINT WM_PRIV_EDITOR; // Message to get back on to the UI thread when the editor exits
+    static UINT WM_PRIV_VDUPDATE; // Message to get back on to the UI thread when update in virtual desktops is registered
 
     // Did we terminate the editor or was it closed cleanly?
     enum class EditorExitKind : byte
@@ -230,9 +229,10 @@ private:
     };
 };
 
-UINT FancyZones::WM_PRIV_VDCHANGED = RegisterWindowMessage(L"{128c2cb0-6bdf-493e-abbe-f8705e04aa95}");
+UINT FancyZones::WM_PRIV_VDSWITCH = RegisterWindowMessage(L"{dc9d4d71-9c4c-4b14-a9e8-83fba5a4fed7}");
 UINT FancyZones::WM_PRIV_VDINIT = RegisterWindowMessage(L"{469818a8-00fa-4069-b867-a1da484fcd9a}");
 UINT FancyZones::WM_PRIV_EDITOR = RegisterWindowMessage(L"{87543824-7080-4e91-9d9c-0404642fc7b6}");
+UINT FancyZones::WM_PRIV_VDUPDATE = RegisterWindowMessage(L"{f043b89a-bc11-4d89-9abb-19fa4bbd84ae}");
 
 // IFancyZones
 IFACEMETHODIMP_(void)
@@ -263,12 +263,9 @@ FancyZones::Run() noexcept
                       } })
         .wait();
 
-    if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VirtualDesktops", 0, KEY_ALL_ACCESS, &m_virtualDesktopsRegKey) == ERROR_SUCCESS)
-    {
-        m_terminateVirtualDesktopTrackerEvent.reset(CreateEvent(nullptr, FALSE, FALSE, nullptr));
-        m_virtualDesktopTrackerThread.submit(
-            OnThreadExecutor::task_t{ std::bind(&FancyZones::HandleVirtualDesktopUpdates, this, m_terminateVirtualDesktopTrackerEvent.get()) });
-    }
+    m_terminateVirtualDesktopTrackerEvent.reset(CreateEvent(nullptr, FALSE, FALSE, nullptr));
+    m_virtualDesktopTrackerThread.submit(
+        OnThreadExecutor::task_t{ std::bind(&FancyZones::HandleVirtualDesktopUpdates, this, m_terminateVirtualDesktopTrackerEvent.get()) });
 }
 
 // IFancyZones
@@ -287,11 +284,7 @@ FancyZones::Destroy() noexcept
     {
         SetEvent(m_terminateVirtualDesktopTrackerEvent.get());
     }
-    if (m_virtualDesktopsRegKey)
-    {
-        RegCloseKey(m_virtualDesktopsRegKey);
-        m_virtualDesktopsRegKey = nullptr;
-    }
+    VirtualDesktopUtils::CloseVirtualDesktopsRegKey();
 }
 
 // IFancyZonesCallback
@@ -301,7 +294,7 @@ FancyZones::VirtualDesktopChanged() noexcept
     // VirtualDesktopChanged is called from another thread but results in new windows being created.
     // Jump over to the UI thread to handle it.
     std::shared_lock readLock(m_lock);
-    PostMessage(m_window, WM_PRIV_VDCHANGED, 0, 0);
+    PostMessage(m_window, WM_PRIV_VDSWITCH, 0, 0);
 }
 
 // IFancyZonesCallback
@@ -567,7 +560,7 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
 
     default:
     {
-        if (message == WM_PRIV_VDCHANGED)
+        if (message == WM_PRIV_VDSWITCH)
         {
             OnDisplayChange(DisplayChangeType::VirtualDesktop);
         }
@@ -589,6 +582,16 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
                 m_terminateEditorEvent.release();
             }
         }
+        else if (message = WM_PRIV_VDUPDATE)
+        {
+            std::vector<GUID> ids{};
+            if (VirtualDesktopUtils::GetVirtualDekstopIds(ids))
+            {
+                std::unordered_set<GUID> idSet(std::begin(ids), std::end(ids));
+                RegisterVirtualDesktopUpdates(idSet);
+            }
+
+        }
         else
         {
             return DefWindowProc(window, message, wparam, lparam);
@@ -604,29 +607,14 @@ void FancyZones::OnDisplayChange(DisplayChangeType changeType) noexcept
     if (changeType == DisplayChangeType::VirtualDesktop ||
         changeType == DisplayChangeType::Initialization)
     {
-        // Explorer persists this value to the registry on a per session basis but only after
-        // the first virtual desktop switch happens. If the user hasn't switched virtual desktops in this session
-        // then this value will be empty. This means loading the first virtual desktop's configuration can be
-        // funky the first time we load up at boot since the user will not have switched virtual desktops yet.
-        GUID currentVirtualDesktopId{};
-        if (VirtualDesktopUtils::GetCurrentVirtualDesktopId(&currentVirtualDesktopId))
+        if (VirtualDesktopUtils::GetCurrentVirtualDesktopId(&m_currentVirtualDesktopId))
         {
             std::unique_lock writeLock(m_lock);
-            m_currentVirtualDesktopId = currentVirtualDesktopId;
-        }
-        else
-        {
-            std::vector<GUID> ids{};
-            if (VirtualDesktopUtils::GetVirtualDekstopIds(m_virtualDesktopsRegKey, ids) && !ids.empty())
+            wil::unique_cotaskmem_string id;
+            if (changeType == DisplayChangeType::Initialization &&
+                SUCCEEDED_LOG(StringFromCLSID(m_currentVirtualDesktopId, &id)))
             {
-                std::unique_lock writeLock(m_lock);
-                m_currentVirtualDesktopId = ids[0];
-                wil::unique_cotaskmem_string id;
-                if (changeType == DisplayChangeType::Initialization &&
-                    SUCCEEDED_LOG(StringFromCLSID(m_currentVirtualDesktopId, &id)))
-                {
-                    JSONHelpers::FancyZonesDataInstance().UpdatePrimaryDesktopData(id.get());
-                }
+                JSONHelpers::FancyZonesDataInstance().UpdatePrimaryDesktopData(id.get());
             }
         }
     }
@@ -829,11 +817,16 @@ bool FancyZones::OnSnapHotkey(DWORD vkCode) noexcept
 
 void FancyZones::HandleVirtualDesktopUpdates(HANDLE fancyZonesDestroyedEvent) noexcept
 {
+    HKEY virtualDesktopsRegKey = VirtualDesktopUtils::GetVirtualDesktopsRegKey();
+    if (!virtualDesktopsRegKey)
+    {
+        return;
+    }
     HANDLE regKeyEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     HANDLE events[2] = { regKeyEvent, fancyZonesDestroyedEvent };
     while (1)
     {
-        if (RegNotifyChangeKeyValue(m_virtualDesktopsRegKey, TRUE, REG_NOTIFY_CHANGE_LAST_SET, regKeyEvent, TRUE) != ERROR_SUCCESS)
+        if (RegNotifyChangeKeyValue(virtualDesktopsRegKey, TRUE, REG_NOTIFY_CHANGE_LAST_SET, regKeyEvent, TRUE) != ERROR_SUCCESS)
         {
             return;
         }
@@ -842,12 +835,8 @@ void FancyZones::HandleVirtualDesktopUpdates(HANDLE fancyZonesDestroyedEvent) no
             // if fancyZonesDestroyedEvent is signalized or WaitForMultipleObjects failed, terminate thread execution
             return;
         }
-        std::vector<GUID> ids{};
-        if (VirtualDesktopUtils::GetVirtualDekstopIds(m_virtualDesktopsRegKey, ids))
-        {
-            std::unordered_set<GUID> idSet(std::begin(ids), std::end(ids));
-            RegisterVirtualDesktopUpdates(idSet);
-        }
+        std::shared_lock readLock(m_lock);
+        PostMessage(m_window, WM_PRIV_VDUPDATE, 0, 0);
     }
 }
 
