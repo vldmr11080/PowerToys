@@ -133,7 +133,7 @@ namespace JSONHelpers
 
     struct AppZoneHistoryData
     {
-        std::map<DWORD, HWND> processIdToHandleMap; // Maps process id(DWORD) of application to zoned window handle(HWND)
+        std::unordered_map<DWORD, HWND> processIdToHandleMap; // maps process id of application to zoned window handle
 
         std::wstring zoneSetUuid;
         std::wstring deviceId;
@@ -266,6 +266,7 @@ namespace JSONHelpers
     private:
         void MigrateCustomZoneSetsFromRegistry();
         void RemoveDesktopAppZoneHistory(const std::wstring& desktopId);
+        bool HandleWindowRemovalFromZone(HWND window, AppZoneHistoryData& data);
 
         std::unordered_map<std::wstring, std::vector<AppZoneHistoryData>> appZoneHistoryMap{};
         std::unordered_map<std::wstring, DeviceInfoData> deviceInfoMap{};

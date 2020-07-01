@@ -2,6 +2,7 @@
 #include "JsonHelpers.h"
 #include "ZoneSet.h"
 #include "trace.h"
+#include "Settings.h"
 
 #include <common/common.h>
 
@@ -11,6 +12,7 @@
 #include <regex>
 #include <sstream>
 #include <unordered_set>
+#include <algorithm>
 
 namespace
 {
@@ -31,6 +33,15 @@ namespace
     {
         // Format: <device-id>_<resolution>_<virtual-desktop-id>
         return deviceId.substr(deviceId.rfind('_') + 1);
+    }
+
+    FILETIME GetCurrentFileTime()
+    {
+        SYSTEMTIME systemTime{};
+        GetSystemTime(&systemTime);
+        FILETIME currentFileTime{};
+        SystemTimeToFileTime(&systemTime, &currentFileTime);
+        return currentFileTime;
     }
 }
 
@@ -442,6 +453,70 @@ namespace JSONHelpers
         return {};
     }
 
+    bool FancyZonesData::HandleWindowRemovalFromZone(HWND window, AppZoneHistoryData& data)
+    {
+        if (!IsAnotherWindowOfApplicationInstanceZoned(window, data.deviceId))
+        {
+            DWORD processId = 0;
+            GetWindowThreadProcessId(window, &processId);
+
+            data.processIdToHandleMap.erase(processId);
+        }
+
+        size_t windowZoneStamp = reinterpret_cast<size_t>(::GetProp(window, MULTI_ZONE_STAMP));
+        HWND newWindow{ nullptr };
+        FILETIME currentMin = GetCurrentFileTime();
+        for (auto placedWindow : data.processIdToHandleMap)
+        {
+            if (IsWindow(placedWindow.second))
+            {
+                size_t placedWindowZoneStamp = reinterpret_cast<size_t>(::GetProp(placedWindow.second, MULTI_ZONE_STAMP));
+                if (placedWindowZoneStamp == windowZoneStamp)
+                {
+                    // if there is another instance of same appliaction placed in the same zone don't erase history
+                    return false;
+                }
+                else
+                {
+                    // find earliest started process from other instances of same application
+                    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, placedWindow.first);
+                    if (hProcess)
+                    {
+                        FILETIME creationTime{};
+                        FILETIME exitTime{};
+                        FILETIME kernelTime{};
+                        FILETIME userTime{};
+                        if (GetProcessTimes(hProcess, &creationTime, &exitTime, &kernelTime, &userTime) &&
+                            CompareFileTime(&currentMin, &creationTime) == 1)
+                        {
+                            newWindow = placedWindow.second;
+                            currentMin = creationTime;
+                        }
+                        CloseHandle(hProcess);
+                    }
+                }
+            }
+        }
+        // update app zone history with zone index set from earliest started process (if any)
+        if (newWindow)
+        {
+            std::vector<int> zoneIndexSet{};
+            size_t bitmask = reinterpret_cast<size_t>(::GetProp(newWindow, MULTI_ZONE_STAMP));
+            for (int i = 0; i < std::numeric_limits<size_t>::digits; i++)
+            {
+                if ((1ull << i) & bitmask)
+                {
+                    zoneIndexSet.push_back(i);
+                }
+            }
+            data.zoneIndexSet = std::move(zoneIndexSet);
+            SaveFancyZonesData();
+            return false;
+        }
+
+        return true;
+    }
+
     bool FancyZonesData::RemoveAppLastZone(HWND window, const std::wstring_view& deviceId, const std::wstring_view& zoneSetId)
     {
         std::scoped_lock lock{ dataLock };
@@ -456,30 +531,20 @@ namespace JSONHelpers
                 {
                     if (data->deviceId == deviceId && data->zoneSetUuid == zoneSetId)
                     {
-                        if (!IsAnotherWindowOfApplicationInstanceZoned(window, deviceId))
+                        if (HandleWindowRemovalFromZone(window, *data))
                         {
-                            DWORD processId = 0;
-                            GetWindowThreadProcessId(window, &processId);
-
-                            data->processIdToHandleMap.erase(processId);
-                        }
-
-                        // if there is another instance placed don't erase history
-                        for (auto placedWindow : data->processIdToHandleMap)
-                        {
-                            if (IsWindow(placedWindow.second))
+                            data = perDesktopData.erase(data);
+                            if (perDesktopData.empty())
                             {
-                                return false;
+                                appZoneHistoryMap.erase(processPath);
                             }
+                            SaveFancyZonesData();
+                            return true;
                         }
-
-                        data = perDesktopData.erase(data);
-                        if (perDesktopData.empty())
+                        else
                         {
-                            appZoneHistoryMap.erase(processPath);
+                            return false;
                         }
-                        SaveFancyZonesData();
-                        return true;
                     }
                     else
                     {
@@ -535,7 +600,7 @@ namespace JSONHelpers
             }
         }
 
-        std::map<DWORD, HWND> processIdToHandleMap{};
+        std::unordered_map<DWORD, HWND> processIdToHandleMap{};
         processIdToHandleMap[processId] = window;
         AppZoneHistoryData data{ .processIdToHandleMap = processIdToHandleMap,
                                  .zoneSetUuid = zoneSetId,
