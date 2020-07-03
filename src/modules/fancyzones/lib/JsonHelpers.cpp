@@ -47,7 +47,7 @@ namespace
     bool GetProcessCreationTime(DWORD processId, FILETIME* creationTime)
     {
         bool result{ false };
-        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, processId);
         if (hProcess)
         {
             FILETIME exitTime{};
@@ -511,7 +511,7 @@ namespace JSONHelpers
                 size_t placedWindowZoneStamp = reinterpret_cast<size_t>(::GetProp(placedWindow.second, MULTI_ZONE_STAMP));
                 if (placedWindowZoneStamp == windowZoneStamp)
                 {
-                    // if there is another instance of same appliaction placed in the same zone don't erase history
+                    // if there is another instance of same application placed in the same zone don't erase history
                     return false;
                 }
                 else
