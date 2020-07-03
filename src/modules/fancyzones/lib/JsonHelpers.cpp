@@ -584,6 +584,7 @@ namespace JSONHelpers
         {
             return false;
         }
+        UpdateProcessIdToHandleMap(window, deviceId);
 
         auto processPath = get_process_path(window);
         if (processPath.empty())
