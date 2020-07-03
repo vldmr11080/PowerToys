@@ -12,7 +12,6 @@
 #include <regex>
 #include <sstream>
 #include <unordered_set>
-#include <algorithm>
 
 namespace
 {
