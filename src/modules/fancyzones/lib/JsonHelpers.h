@@ -266,6 +266,8 @@ namespace JSONHelpers
     private:
         void MigrateCustomZoneSetsFromRegistry();
         void RemoveDesktopAppZoneHistory(const std::wstring& desktopId);
+        void RemoveWindowProcessFromAppZoneHistory(HWND window, AppZoneHistoryData& data);
+        void UpdateAppZoneHistoryWithNewInstance(HWND window, AppZoneHistoryData& data);
         bool HandleWindowRemovalFromZone(HWND window, AppZoneHistoryData& data);
 
         std::unordered_map<std::wstring, std::vector<AppZoneHistoryData>> appZoneHistoryMap{};

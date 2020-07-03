@@ -43,6 +43,24 @@ namespace
         SystemTimeToFileTime(&systemTime, &currentFileTime);
         return currentFileTime;
     }
+
+    bool GetProcessCreationTime(DWORD processId, FILETIME* creationTime)
+    {
+        bool result{ false };
+        HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+        if (hProcess)
+        {
+            FILETIME exitTime{};
+            FILETIME kernelTime{};
+            FILETIME userTime{};
+            if (GetProcessTimes(hProcess, creationTime, &exitTime, &kernelTime, &userTime))
+            {
+                result = true;
+            }
+            CloseHandle(hProcess);
+        }
+        return result;
+    }
 }
 
 namespace JSONHelpers
@@ -453,7 +471,7 @@ namespace JSONHelpers
         return {};
     }
 
-    bool FancyZonesData::HandleWindowRemovalFromZone(HWND window, AppZoneHistoryData& data)
+    void FancyZonesData::RemoveWindowProcessFromAppZoneHistory(HWND window, AppZoneHistoryData& data)
     {
         if (!IsAnotherWindowOfApplicationInstanceZoned(window, data.deviceId))
         {
@@ -462,6 +480,26 @@ namespace JSONHelpers
 
             data.processIdToHandleMap.erase(processId);
         }
+    }
+
+    void FancyZonesData::UpdateAppZoneHistoryWithNewInstance(HWND window, AppZoneHistoryData& data)
+    {
+        std::vector<int> zoneIndexSet{};
+        size_t bitmask = reinterpret_cast<size_t>(::GetProp(window, MULTI_ZONE_STAMP));
+        for (int i = 0; i < std::numeric_limits<size_t>::digits; i++)
+        {
+            if ((1ull << i) & bitmask)
+            {
+                zoneIndexSet.push_back(i);
+            }
+        }
+        data.zoneIndexSet = std::move(zoneIndexSet);
+        SaveFancyZonesData();
+    }
+
+    bool FancyZonesData::HandleWindowRemovalFromZone(HWND window, AppZoneHistoryData& data)
+    {
+        RemoveWindowProcessFromAppZoneHistory(window, data);
 
         size_t windowZoneStamp = reinterpret_cast<size_t>(::GetProp(window, MULTI_ZONE_STAMP));
         HWND newWindow{ nullptr };
@@ -479,20 +517,12 @@ namespace JSONHelpers
                 else
                 {
                     // find earliest started process from other instances of same application
-                    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, placedWindow.first);
-                    if (hProcess)
+                    FILETIME creationTime{};
+                    if (GetProcessCreationTime(placedWindow.first, &creationTime) &&
+                        CompareFileTime(&currentMin, &creationTime) == 1)
                     {
-                        FILETIME creationTime{};
-                        FILETIME exitTime{};
-                        FILETIME kernelTime{};
-                        FILETIME userTime{};
-                        if (GetProcessTimes(hProcess, &creationTime, &exitTime, &kernelTime, &userTime) &&
-                            CompareFileTime(&currentMin, &creationTime) == 1)
-                        {
-                            newWindow = placedWindow.second;
-                            currentMin = creationTime;
-                        }
-                        CloseHandle(hProcess);
+                        newWindow = placedWindow.second;
+                        currentMin = creationTime;
                     }
                 }
             }
@@ -500,17 +530,7 @@ namespace JSONHelpers
         // update app zone history with zone index set from earliest started process (if any)
         if (newWindow)
         {
-            std::vector<int> zoneIndexSet{};
-            size_t bitmask = reinterpret_cast<size_t>(::GetProp(newWindow, MULTI_ZONE_STAMP));
-            for (int i = 0; i < std::numeric_limits<size_t>::digits; i++)
-            {
-                if ((1ull << i) & bitmask)
-                {
-                    zoneIndexSet.push_back(i);
-                }
-            }
-            data.zoneIndexSet = std::move(zoneIndexSet);
-            SaveFancyZonesData();
+            UpdateAppZoneHistoryWithNewInstance(newWindow, data);
             return false;
         }
 
