@@ -34,15 +34,6 @@ namespace
         return deviceId.substr(deviceId.rfind('_') + 1);
     }
 
-    FILETIME GetCurrentFileTime()
-    {
-        SYSTEMTIME systemTime{};
-        GetSystemTime(&systemTime);
-        FILETIME currentFileTime{};
-        SystemTimeToFileTime(&systemTime, &currentFileTime);
-        return currentFileTime;
-    }
-
     bool GetProcessCreationTime(DWORD processId, FILETIME* creationTime)
     {
         bool result{ false };
@@ -59,6 +50,19 @@ namespace
             CloseHandle(hProcess);
         }
         return result;
+    }
+
+    std::vector<int> GetZoneIndexSet(const size_t& bitmask)
+    {
+        std::vector<int> zoneIndexSet{};
+        for (int i = 0; i < std::numeric_limits<size_t>::digits; i++)
+        {
+            if ((1ull << i) & bitmask)
+            {
+                zoneIndexSet.push_back(i);
+            }
+        }
+        return zoneIndexSet;
     }
 }
 
@@ -483,16 +487,8 @@ namespace JSONHelpers
 
     void FancyZonesData::UpdateAppZoneHistoryWithNewInstance(HWND window, AppZoneHistoryData& data)
     {
-        std::vector<int> zoneIndexSet{};
         size_t bitmask = reinterpret_cast<size_t>(::GetProp(window, MULTI_ZONE_STAMP));
-        for (int i = 0; i < std::numeric_limits<size_t>::digits; i++)
-        {
-            if ((1ull << i) & bitmask)
-            {
-                zoneIndexSet.push_back(i);
-            }
-        }
-        data.zoneIndexSet = std::move(zoneIndexSet);
+        data.zoneIndexSet = GetZoneIndexSet(bitmask);
         SaveFancyZonesData();
     }
 
@@ -501,8 +497,13 @@ namespace JSONHelpers
         RemoveWindowProcessFromAppZoneHistory(window, data);
 
         size_t windowZoneStamp = reinterpret_cast<size_t>(::GetProp(window, MULTI_ZONE_STAMP));
+        if (GetZoneIndexSet(windowZoneStamp) != data.zoneIndexSet)
+        {
+            // app zone history was saved for different window position, skip further processing for this window
+            return false;
+        }
         HWND newWindow{ nullptr };
-        FILETIME currentMin = GetCurrentFileTime();
+        FILETIME currentMax{};
         for (auto placedWindow : data.processIdToHandleMap)
         {
             if (IsWindow(placedWindow.second))
@@ -515,18 +516,18 @@ namespace JSONHelpers
                 }
                 else
                 {
-                    // find earliest started process from other instances of same application
+                    // find latest started process from other instances of same application
                     FILETIME creationTime{};
                     if (GetProcessCreationTime(placedWindow.first, &creationTime) &&
-                        CompareFileTime(&currentMin, &creationTime) == 1)
+                        CompareFileTime(&creationTime, &currentMax) == 1)
                     {
                         newWindow = placedWindow.second;
-                        currentMin = creationTime;
+                        currentMax = creationTime;
                     }
                 }
             }
         }
-        // update app zone history with zone index set from earliest started process (if any)
+        // update app zone history with zone index set from latest started process (if any)
         if (newWindow)
         {
             UpdateAppZoneHistoryWithNewInstance(newWindow, data);
@@ -603,14 +604,7 @@ namespace JSONHelpers
             {
                 if (data.deviceId == deviceId)
                 {
-                    for (auto placedWindow : data.processIdToHandleMap)
-                    {
-                        if (IsWindow(placedWindow.second) && processId != placedWindow.first)
-                        {
-                            return false;
-                        }
-                    }
-                    // application already has history on this desktop, but zone (or zone layout) has changed
+                    // application already has history on this work area, update it with new window position
                     data.processIdToHandleMap[processId] = window;
                     data.zoneSetUuid = zoneSetId;
                     data.zoneIndexSet = zoneIndexSet;
