@@ -86,6 +86,15 @@ interface __declspec(uuid("{E4839EB7-669D-49CF-84A9-71A2DFD851A3}")) IZoneSet : 
      */
     IFACEMETHOD_(void, MoveWindowIntoZoneByPoint)(HWND window, HWND zoneWindow, POINT ptClient) = 0;
     /**
+     * Swap windows in adjacent zones based on direction (using WIN + ALT + LEFT/RIGHT arrow).
+     *
+     * @param   window     Handle of window which should be assigned to zone.
+     * @param   zoneWidnow The m_window of a ZoneWindow, it's a hidden window representing the
+     *                     current monitor desktop work area.
+     * @param   vkCode     Pressed arrow key.
+     */
+    IFACEMETHOD_(void, SwapWindowsBetweenZones)(HWND window, HWND zoneWindow, DWORD vkCode) = 0;
+    /**
      * Calculate zone coordinates within zone layout based on number of zones and spacing. Used for one of
      * the predefined layouts (focus, columns, rows, grid, priority grid) or for custom layout.
      *

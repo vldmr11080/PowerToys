@@ -82,6 +82,7 @@ public:
 
     void MoveWindowIntoZoneByIndexSet(HWND window, const std::vector<int>& indexSet, winrt::com_ptr<IZoneWindow> zoneWindow) noexcept;
     bool MoveWindowIntoZoneByDirection(HWND window, DWORD vkCode, bool cycle, winrt::com_ptr<IZoneWindow> zoneWindow);
+    void SwapWindowsBetweenZones(HWND window, DWORD vkCode, winrt::com_ptr<IZoneWindow> zoneWindow) noexcept;
 
 private:
     void WarnIfElevationIsRequired(HWND window) noexcept;
@@ -170,6 +171,11 @@ void WindowMoveHandler::MoveWindowIntoZoneByIndexSet(HWND window, const std::vec
 bool WindowMoveHandler::MoveWindowIntoZoneByDirection(HWND window, DWORD vkCode, bool cycle, winrt::com_ptr<IZoneWindow> zoneWindow)
 {
     return pimpl->MoveWindowIntoZoneByDirection(window, vkCode, cycle, zoneWindow);
+}
+
+void WindowMoveHandler::SwapWindowsBetweenZones(HWND window, DWORD vkCode, winrt::com_ptr<IZoneWindow> zoneWindow) noexcept
+{
+    pimpl->SwapWindowsBetweenZones(window, vkCode, zoneWindow);
 }
 
 void WindowMoveHandlerPrivate::OnMouseDown() noexcept
@@ -390,6 +396,14 @@ void WindowMoveHandlerPrivate::MoveWindowIntoZoneByIndexSet(HWND window, const s
 bool WindowMoveHandlerPrivate::MoveWindowIntoZoneByDirection(HWND window, DWORD vkCode, bool cycle, winrt::com_ptr<IZoneWindow> zoneWindow)
 {
     return zoneWindow && zoneWindow->MoveWindowIntoZoneByDirection(window, vkCode, cycle);
+}
+
+void WindowMoveHandlerPrivate::SwapWindowsBetweenZones(HWND window, DWORD vkCode, winrt::com_ptr<IZoneWindow> zoneWindow) noexcept
+{
+    if (zoneWindow)
+    {
+        zoneWindow->SwapWindowsBetweenZones(window, vkCode);
+    }
 }
 
 void WindowMoveHandlerPrivate::WarnIfElevationIsRequired(HWND window) noexcept

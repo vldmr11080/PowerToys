@@ -227,7 +227,9 @@ private:
     void UpdateZoneWindows() noexcept;
     void UpdateWindowsPositions() noexcept;
     void CycleActiveZoneSet(DWORD vkCode) noexcept;
-    bool OnSnapHotkey(DWORD vkCode) noexcept;
+    void HandleWindowMoveByDirection(HWND window, DWORD vkCode) noexcept;
+    void HandleWindowSwapByDirection(HWND window, DWORD vkCode) noexcept;
+    void OnSnapHotkey(bool move, DWORD vkCode) noexcept;
 
     void RegisterVirtualDesktopUpdates(std::vector<GUID>& ids) noexcept;
 
@@ -543,7 +545,8 @@ FancyZones::OnKeyDown(PKBDLLHOOKSTRUCT info) noexcept
 {
     // Return true to swallow the keyboard event
     bool const shift = GetAsyncKeyState(VK_SHIFT) & 0x8000;
-    bool const win = GetAsyncKeyState(VK_LWIN) & 0x8000 || GetAsyncKeyState(VK_RWIN) & 0x8000;
+    bool const win   = GetAsyncKeyState(VK_LWIN) & 0x8000 || GetAsyncKeyState(VK_RWIN) & 0x8000;
+    bool const alt   = GetAsyncKeyState(VK_MENU) & 0x8000 || GetAsyncKeyState(VK_RMENU) & 0x8000;
     if (win && !shift)
     {
         bool const ctrl = GetAsyncKeyState(VK_CONTROL) & 0x8000;
@@ -564,7 +567,8 @@ FancyZones::OnKeyDown(PKBDLLHOOKSTRUCT info) noexcept
             {
                 Trace::FancyZones::OnKeyDown(info->vkCode, win, ctrl, false /*inMoveSize*/);
                 // Win+Left, Win+Right will cycle through Zones in the active ZoneSet when WM_PRIV_LOWLEVELKB's handled
-                PostMessageW(m_window, WM_PRIV_LOWLEVELKB, 0, info->vkCode);
+                // Win+Alt+Left, Win+Alt+Right will swap windows in adjacent zones in active ZoneSet when WM_PRIV_LOWLEVELKB's handled
+                PostMessageW(m_window, WM_PRIV_LOWLEVELKB, !alt, info->vkCode);
                 return true;
             }
         }
@@ -752,7 +756,8 @@ LRESULT FancyZones::WndProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
 
         if (message == WM_PRIV_LOWLEVELKB)
         {
-            OnSnapHotkey(static_cast<DWORD>(lparam));
+            OnSnapHotkey(static_cast<bool>(wparam) /* move or swap window */,
+                         static_cast<DWORD>(lparam) /* arrow key code */);
         }
         else if (message == WM_PRIV_VD_INIT)
         {
@@ -990,67 +995,86 @@ void FancyZones::CycleActiveZoneSet(DWORD vkCode) noexcept
     }
 }
 
-bool FancyZones::OnSnapHotkey(DWORD vkCode) noexcept
+void FancyZones::HandleWindowMoveByDirection(HWND window, DWORD vkCode) noexcept
+{
+    const HMONITOR current = MonitorFromWindow(window, MONITOR_DEFAULTTONULL);
+    if (current)
+    {
+        std::vector<HMONITOR> monitorInfo = GetMonitorsSorted();
+        if (monitorInfo.size() > 1 && m_settings->GetSettings()->moveWindowAcrossMonitors)
+        {
+            // Multi monitor environment.
+            auto currMonitorInfo = std::find(std::begin(monitorInfo), std::end(monitorInfo), current);
+            do
+            {
+                std::unique_lock writeLock(m_lock);
+                if (m_windowMoveHandler.MoveWindowIntoZoneByDirection(window, vkCode, false /* cycle through zones */, m_workAreaHandler.GetWorkArea(m_currentDesktopId, *currMonitorInfo)))
+                {
+                    return;
+                }
+                // We iterated through all zones in current monitor zone layout, move on to next one (or previous depending on direction).
+                if (vkCode == VK_RIGHT)
+                {
+                    currMonitorInfo = std::next(currMonitorInfo);
+                    if (currMonitorInfo == std::end(monitorInfo))
+                    {
+                        currMonitorInfo = std::begin(monitorInfo);
+                    }
+                }
+                else if (vkCode == VK_LEFT)
+                {
+                    if (currMonitorInfo == std::begin(monitorInfo))
+                    {
+                        currMonitorInfo = std::end(monitorInfo);
+                    }
+                    currMonitorInfo = std::prev(currMonitorInfo);
+                }
+            } while (*currMonitorInfo != current);
+        }
+        else
+        {
+            // Single monitor environment.
+            std::unique_lock writeLock(m_lock);
+            if (m_settings->GetSettings()->restoreSize)
+            {
+                bool moved = m_windowMoveHandler.MoveWindowIntoZoneByDirection(window, vkCode, false /* cycle through zones */, m_workAreaHandler.GetWorkArea(m_currentDesktopId, current));
+                if (!moved)
+                {
+                    RestoreWindowOrigin(window);
+                    RestoreWindowSize(window);
+                }
+            }
+            else
+            {
+                m_windowMoveHandler.MoveWindowIntoZoneByDirection(window, vkCode, true /* cycle through zones */, m_workAreaHandler.GetWorkArea(m_currentDesktopId, current));
+            }
+        }
+    }
+}
+
+void FancyZones::HandleWindowSwapByDirection(HWND window, DWORD vkCode) noexcept
+{
+    const HMONITOR current = MonitorFromWindow(window, MONITOR_DEFAULTTONULL);
+    if (current)
+    {
+        m_windowMoveHandler.SwapWindowsBetweenZones(window, vkCode, m_workAreaHandler.GetWorkArea(m_currentDesktopId, current));
+    }
+}
+
+void FancyZones::OnSnapHotkey(bool move, DWORD vkCode) noexcept
 {
     auto window = GetForegroundWindow();
     if (IsInterestingWindow(window, m_settings->GetSettings()->excludedAppsArray))
     {
-        const HMONITOR current = MonitorFromWindow(window, MONITOR_DEFAULTTONULL);
-        if (current)
+        if (move)
         {
-            std::vector<HMONITOR> monitorInfo = GetMonitorsSorted();
-            if (monitorInfo.size() > 1 && m_settings->GetSettings()->moveWindowAcrossMonitors)
-            {
-                // Multi monitor environment.
-                auto currMonitorInfo = std::find(std::begin(monitorInfo), std::end(monitorInfo), current);
-                do
-                {
-                    std::unique_lock writeLock(m_lock);
-                    if (m_windowMoveHandler.MoveWindowIntoZoneByDirection(window, vkCode, false /* cycle through zones */, m_workAreaHandler.GetWorkArea(m_currentDesktopId, *currMonitorInfo)))
-                    {
-                        return true;
-                    }
-                    // We iterated through all zones in current monitor zone layout, move on to next one (or previous depending on direction).
-                    if (vkCode == VK_RIGHT)
-                    {
-                        currMonitorInfo = std::next(currMonitorInfo);
-                        if (currMonitorInfo == std::end(monitorInfo))
-                        {
-                            currMonitorInfo = std::begin(monitorInfo);
-                        }
-                    }
-                    else if (vkCode == VK_LEFT)
-                    {
-                        if (currMonitorInfo == std::begin(monitorInfo))
-                        {
-                            currMonitorInfo = std::end(monitorInfo);
-                        }
-                        currMonitorInfo = std::prev(currMonitorInfo);
-                    }
-                } while (*currMonitorInfo != current);
-            }
-            else
-            {
-                // Single monitor environment.
-                std::unique_lock writeLock(m_lock);
-                if (m_settings->GetSettings()->restoreSize)
-                {
-                    bool moved = m_windowMoveHandler.MoveWindowIntoZoneByDirection(window, vkCode, false /* cycle through zones */, m_workAreaHandler.GetWorkArea(m_currentDesktopId, current));
-                    if (!moved)
-                    {
-                        RestoreWindowOrigin(window);
-                        RestoreWindowSize(window);
-                    }
-                    return true;
-                }
-                else
-                {
-                    return m_windowMoveHandler.MoveWindowIntoZoneByDirection(window, vkCode, true /* cycle through zones */, m_workAreaHandler.GetWorkArea(m_currentDesktopId, current));
-                }
-            }
+            HandleWindowMoveByDirection(window, vkCode);
+        }
+        else
+        {
+            HandleWindowSwapByDirection(window, vkCode);
         }
     }
-    return false;
 }
 
 void FancyZones::RegisterVirtualDesktopUpdates(std::vector<GUID>& ids) noexcept

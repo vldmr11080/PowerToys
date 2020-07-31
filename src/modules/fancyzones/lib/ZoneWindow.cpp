@@ -181,6 +181,8 @@ public:
     IFACEMETHODIMP_(bool)
     MoveWindowIntoZoneByDirection(HWND window, DWORD vkCode, bool cycle) noexcept;
     IFACEMETHODIMP_(void)
+    SwapWindowsBetweenZones(HWND window, DWORD vkCode) noexcept;
+    IFACEMETHODIMP_(void)
     CycleActiveZoneSet(DWORD vkCode) noexcept;
     IFACEMETHODIMP_(std::wstring)
     UniqueId() noexcept { return { m_uniqueId }; }
@@ -433,6 +435,16 @@ ZoneWindow::MoveWindowIntoZoneByDirection(HWND window, DWORD vkCode, bool cycle)
         }
     }
     return false;
+}
+
+IFACEMETHODIMP_(void)
+ZoneWindow::SwapWindowsBetweenZones(HWND window, DWORD vkCode) noexcept
+{
+    if (m_activeZoneSet)
+    {
+        m_activeZoneSet->SwapWindowsBetweenZones(window, m_window.get(), vkCode);
+        // TODO: Should we update app zone history at this point (call SaveWindowProcessToZoneIndex).
+    }
 }
 
 IFACEMETHODIMP_(void)

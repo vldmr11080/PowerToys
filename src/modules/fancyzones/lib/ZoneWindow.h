@@ -68,6 +68,13 @@ interface __declspec(uuid("{7F017528-8110-4FB3-BE41-F472969C2560}")) IZoneWindow
      */
     IFACEMETHOD_(bool, MoveWindowIntoZoneByDirection)(HWND window, DWORD vkCode, bool cycle) = 0;
     /**
+     * Swap windows in adjacent zones based on direction (using WIN + ALT + LEFT/RIGHT arrow).
+     *
+     * @param   window Handle of window which should be assigned to zone.
+     * @param   vkCode Pressed arrow key.
+     */
+    IFACEMETHOD_(void, SwapWindowsBetweenZones)(HWND window, DWORD vkCode) = 0;
+    /**
      * Cycle through active zone layouts (giving hints about each layout).
      *
      * @param   vkCode Pressed key representing layout index.

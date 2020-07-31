@@ -141,6 +141,8 @@ public:
     MoveWindowIntoZoneByDirection(HWND window, HWND zoneWindow, DWORD vkCode, bool cycle) noexcept;
     IFACEMETHODIMP_(void)
     MoveWindowIntoZoneByPoint(HWND window, HWND zoneWindow, POINT ptClient) noexcept;
+    IFACEMETHODIMP_(void)
+    SwapWindowsBetweenZones(HWND window, HWND zoneWindow, DWORD vkCode) noexcept;
     IFACEMETHODIMP_(bool)
     CalculateZones(MONITORINFO monitorInfo, int zoneCount, int spacing) noexcept;
     IFACEMETHODIMP_(bool)
@@ -366,6 +368,56 @@ ZoneSet::MoveWindowIntoZoneByPoint(HWND window, HWND zoneWindow, POINT ptClient)
 {
     auto zones = ZonesFromPoint(ptClient);
     MoveWindowIntoZoneByIndexSet(window, zoneWindow, zones);
+}
+
+IFACEMETHODIMP_(void)
+ZoneSet::SwapWindowsBetweenZones(HWND window, HWND zoneWindow, DWORD vkCode) noexcept
+{
+    OutputDebugString(L"SwapWindowsBetweenZones\n");
+    if (m_zones.empty())
+    {
+        return;
+    }
+
+    std::vector<int> indexSet = GetZoneIndexSetFromWindow(window);
+    int zoneCount = static_cast<int>(m_zones.size());
+
+    if (indexSet.size() == 0)
+    {
+        // The window was not assigned to any zone here so there is nothing to swap. Fallback to default moving window to zone.
+        MoveWindowIntoZoneByIndexSet(window, zoneWindow, { vkCode == VK_LEFT ? zoneCount - 1 : 0 });
+        return;
+    }
+
+    int zoneIdx     = indexSet[0];
+    int adjacentIdx = (vkCode == VK_LEFT) ? zoneIdx - 1 : zoneIdx + 1;
+
+    if (adjacentIdx == -1)
+    {
+        adjacentIdx = zoneCount - 1;
+    }
+    else if (adjacentIdx == zoneCount)
+    {
+        adjacentIdx = 0;
+    }
+
+    bool swapped{ false };
+    for (auto& [placedWindow, zones] : m_windowIndexSet)
+    {
+        if (!zones.empty() && (zones[0] == adjacentIdx))
+        {
+            // There is a window placed in adjacent zone.
+            MoveWindowIntoZoneByIndexSet(window, zoneWindow, { adjacentIdx });
+            MoveWindowIntoZoneByIndexSet(placedWindow, zoneWindow, { zoneIdx });
+            swapped = true;
+            break;
+        }
+    }
+    if (!swapped)
+    {
+        // Window swap is not performed since no window is found in adjacent zone. Fallback to default moving window to zone.
+        MoveWindowIntoZoneByDirection(window, zoneWindow, vkCode, true);
+    }
 }
 
 IFACEMETHODIMP_(bool)
