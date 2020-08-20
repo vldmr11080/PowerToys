@@ -35,6 +35,10 @@ BEGIN
     IDS_KEYBOARD_LISTENER_ERROR                                "Cannot install keyboard listener."
     IDS_WINDOW_EVENT_LISTENER_ERROR                            "Cannot install Windows event listener."
     IDS_POWERTOYS_FANCYZONES                                   "PowerToys - FancyZones"
+    IDS_FANCYZONES_DATA_ERROR                                  "Cannot find path to FancyZones persisted data. Please report the bug to"
+    IDS_FANCYZONES_SETTINGS_LOAD_ERROR                         "Cannot load FancyZones settings. Default settings will be used."
+    IDS_FANCYZONES_SETTINGS_SAVE_ERROR                         "Cannot save FancyZones settings. Please retry again later, if problem persists report the bug to"
+    IDS_FANCYZONES_EDITOR_LAUNCH_ERROR                         "Cannot launch FancyZones editor. Please report the bug to"
 END
 
 1 VERSIONINFO

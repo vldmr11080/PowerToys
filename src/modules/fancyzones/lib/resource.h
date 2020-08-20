@@ -43,3 +43,7 @@
 #define IDS_KEYBOARD_LISTENER_ERROR                                 129
 #define IDS_WINDOW_EVENT_LISTENER_ERROR                             130
 #define IDS_POWERTOYS_FANCYZONES                                    131
+#define IDS_FANCYZONES_DATA_ERROR                                   132
+#define IDS_FANCYZONES_SETTINGS_LOAD_ERROR                          133
+#define IDS_FANCYZONES_SETTINGS_SAVE_ERROR                          134
+#define IDS_FANCYZONES_EDITOR_LAUNCH_ERROR                          135
