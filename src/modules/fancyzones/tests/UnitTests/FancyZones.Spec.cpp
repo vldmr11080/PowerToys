@@ -32,24 +32,24 @@ namespace FancyZonesUnitTests
 
             TEST_METHOD (Create)
             {
-                auto actual = MakeFancyZones(m_hInst, m_settings);
+                auto actual = MakeFancyZones(m_hInst, m_settings, nullptr);
                 Assert::IsNotNull(actual.get());
             }
             TEST_METHOD (CreateWithEmptyHinstance)
             {
-                auto actual = MakeFancyZones({}, m_settings);
+                auto actual = MakeFancyZones({}, m_settings, nullptr);
                 Assert::IsNotNull(actual.get());
             }
 
             TEST_METHOD (CreateWithNullHinstance)
             {
-                auto actual = MakeFancyZones(nullptr, m_settings);
+                auto actual = MakeFancyZones(nullptr, m_settings, nullptr);
                 Assert::IsNotNull(actual.get());
             }
 
             TEST_METHOD (CreateWithNullSettings)
             {
-                auto actual = MakeFancyZones(m_hInst, nullptr);
+                auto actual = MakeFancyZones(m_hInst, nullptr, nullptr);
                 Assert::IsNull(actual.get());
             }
     };
@@ -94,7 +94,7 @@ namespace FancyZonesUnitTests
                 m_settings = MakeFancyZonesSettings(m_hInst, m_settingsLocation.c_str());
                 Assert::IsTrue(m_settings != nullptr);
 
-                auto fancyZones = MakeFancyZones(m_hInst, m_settings);
+                auto fancyZones = MakeFancyZones(m_hInst, m_settings, nullptr);
                 Assert::IsTrue(fancyZones != nullptr);
 
                 m_zoneWindowHost = fancyZones.as<IZoneWindowHost>();
@@ -324,7 +324,7 @@ namespace FancyZonesUnitTests
                 m_settings = MakeFancyZonesSettings(m_hInst, m_settingsLocation.c_str());
                 Assert::IsTrue(m_settings != nullptr);
 
-                auto fancyZones = MakeFancyZones(m_hInst, m_settings);
+                auto fancyZones = MakeFancyZones(m_hInst, m_settings, nullptr);
                 Assert::IsTrue(fancyZones != nullptr);
 
                 m_fzCallback = fancyZones.as<IFancyZonesCallback>();

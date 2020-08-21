@@ -43,7 +43,7 @@ namespace NonLocalizable
 struct FancyZones : public winrt::implements<FancyZones, IFancyZones, IFancyZonesCallback, IZoneWindowHost>
 {
 public:
-    FancyZones(HINSTANCE hinstance, const winrt::com_ptr<IFancyZonesSettings>& settings) noexcept :
+    FancyZones(HINSTANCE hinstance, const winrt::com_ptr<IFancyZonesSettings>& settings, std::function<void()> disableCallback) noexcept :
         m_hinstance(hinstance),
         m_settings(settings),
         m_mouseHook(std::bind(&FancyZones::OnMouseDown, this)),
@@ -52,6 +52,8 @@ public:
         m_windowMoveHandler(settings, &m_mouseHook, &m_shiftHook, &m_ctrlHook)
     {
         m_settings->SetCallback(this);
+
+        this->disableCallback = std::move(disableCallback);
     }
 
     // IFancyZones
@@ -277,6 +279,9 @@ private:
 
     OnThreadExecutor m_dpiUnawareThread;
     OnThreadExecutor m_virtualDesktopTrackerThread;
+
+    // If non-recoverable error occurs, trigger disabling of entire FancyZones.
+    static std::function<void()> disableCallback;
 
     static UINT WM_PRIV_VD_INIT; // Scheduled when FancyZones is initialized
     static UINT WM_PRIV_VD_SWITCH; // Scheduled when virtual desktop switch occurs
@@ -1232,12 +1237,14 @@ std::vector<std::pair<HMONITOR, RECT>> FancyZones::GetRawMonitorData() noexcept
     return monitorInfo;
 }
 
-winrt::com_ptr<IFancyZones> MakeFancyZones(HINSTANCE hinstance, const winrt::com_ptr<IFancyZonesSettings>& settings) noexcept
+winrt::com_ptr<IFancyZones> MakeFancyZones(HINSTANCE hinstance,
+                                           const winrt::com_ptr<IFancyZonesSettings>& settings,
+                                           std::function<void()> disableCallback) noexcept
 {
     if (!settings)
     {
         return nullptr;
     }
 
-    return winrt::make_self<FancyZones>(hinstance, settings);
+    return winrt::make_self<FancyZones>(hinstance, settings, disableCallback);
 }
