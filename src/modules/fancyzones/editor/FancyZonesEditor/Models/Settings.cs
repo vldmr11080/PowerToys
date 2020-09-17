@@ -553,6 +553,11 @@ namespace FancyZonesEditor
             return model.Type != LayoutType.Custom;
         }
 
+        public static bool IsCustomCanvaslayout(LayoutModel model)
+        {
+            return model is CanvasLayoutModel;
+        }
+
         // implementation of INotifyPropertyChanged
         public event PropertyChangedEventHandler PropertyChanged;
 

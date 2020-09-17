@@ -53,6 +53,8 @@ namespace FancyZonesEditor.Models
         private const string CanvasJsonTag = "canvas";
         private const string RefWidthJsonTag = "ref-width";
         private const string RefHeightJsonTag = "ref-height";
+        private const string ScreenWidthJsonTag = "screen-width";
+        private const string ScreenHeightJsonTag = "screen-height";
         private const string XJsonTag = "X";
         private const string YJsonTag = "Y";
         private const string WidthJsonTag = "width";
@@ -128,6 +130,14 @@ namespace FancyZonesEditor.Models
             get
             {
                 return _guid;
+            }
+
+            set
+            {
+                if (_guid != value)
+                {
+                    _guid = value;
+                }
             }
         }
 
@@ -301,15 +311,32 @@ namespace FancyZonesEditor.Models
                     }
                     else if (type.Equals(CanvasJsonTag))
                     {
-                        int lastWorkAreaWidth = info.GetProperty(RefWidthJsonTag).GetInt32();
-                        int lastWorkAreaHeight = info.GetProperty(RefHeightJsonTag).GetInt32();
+                        int workAreaWidth = info.GetProperty(RefWidthJsonTag).GetInt32();
+                        int workAreaHeight = info.GetProperty(RefHeightJsonTag).GetInt32();
+
+                        // Old, persisted, custom layout information is lacking real monitor coordinates.
+                        // This information is optional, and custom layout will behave as usual without it.
+                        int? screenWidth = null;
+                        int? screenHeight = null;
+                        try
+                        {
+                            if (info.TryGetProperty(ScreenWidthJsonTag, out JsonElement jsonWidth) &&
+                                info.TryGetProperty(ScreenHeightJsonTag, out JsonElement jsonHeight))
+                            {
+                                screenWidth = jsonWidth.GetInt32();
+                                screenHeight = jsonHeight.GetInt32();
+                            }
+                        }
+                        catch (Exception)
+                        {
+                        }
 
                         JsonElement.ArrayEnumerator zonesEnumerator = info.GetProperty(ZonesJsonTag).EnumerateArray();
                         IList<Int32Rect> zones = new List<Int32Rect>();
 
                         bool error = false;
 
-                        if (lastWorkAreaWidth <= 0 || lastWorkAreaHeight <= 0)
+                        if (workAreaWidth <= 0 || workAreaHeight <= 0)
                         {
                             error = true;
                         }
@@ -337,7 +364,15 @@ namespace FancyZonesEditor.Models
                             continue;
                         }
 
-                        _customModels.Add(new CanvasLayoutModel(uuid, name, LayoutType.Custom, zones, lastWorkAreaWidth, lastWorkAreaHeight));
+                        _customModels.Add(new CanvasLayoutModel(
+                            uuid,
+                            name,
+                            LayoutType.Custom,
+                            zones,
+                            workAreaWidth,
+                            workAreaHeight,
+                            screenWidth,
+                            screenHeight));
                     }
                 }
 
@@ -441,5 +476,10 @@ namespace FancyZonesEditor.Models
                 ShowExceptionMessageBox(ErrorApplyingLayout, ex);
             }
         }
+
+        // Descriptive information about resolution of monitor for which this custom layout was designed
+        public string ScreenInfo => GetScreenInfo();
+
+        protected abstract string GetScreenInfo();
     }
 }

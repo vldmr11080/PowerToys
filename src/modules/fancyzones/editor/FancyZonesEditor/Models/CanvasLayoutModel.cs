@@ -11,7 +11,7 @@ using System.Windows;
 namespace FancyZonesEditor.Models
 {
     // CanvasLayoutModel
-    //  Free form Layout Model, which specifies independent zone rects
+    // Free form Layout Model, which specifies independent zone rects
     public class CanvasLayoutModel : LayoutModel
     {
         // Localizable strings
@@ -20,11 +20,18 @@ namespace FancyZonesEditor.Models
         // Non-localizable strings
         private const string ModelTypeID = "canvas";
 
-        public CanvasLayoutModel(string uuid, string name, LayoutType type, IList<Int32Rect> zones, int workAreaWidth, int workAreaHeight)
+        public CanvasLayoutModel(
+            string uuid,
+            string name,
+            LayoutType type,
+            IList<Int32Rect> zones,
+            int workAreaWidth,
+            int workAreaHeight)
             : base(uuid, name, type)
         {
             lastWorkAreaWidth = workAreaWidth;
             lastWorkAreaHeight = workAreaHeight;
+
             IsScaled = false;
 
             if (ShouldScaleLayout())
@@ -35,6 +42,21 @@ namespace FancyZonesEditor.Models
             {
                 Zones = zones;
             }
+        }
+
+        public CanvasLayoutModel(
+            string uuid,
+            string name,
+            LayoutType type,
+            IList<Int32Rect> zones,
+            int workAreaWidth,
+            int workAreaHeight,
+            int? screenWidth,
+            int? screenHeight)
+            : this(uuid, name, type, zones, workAreaWidth, workAreaHeight)
+        {
+            this.screenWidth = screenWidth;
+            this.screenHeight = screenHeight;
         }
 
         public CanvasLayoutModel(string name, LayoutType type)
@@ -55,10 +77,16 @@ namespace FancyZonesEditor.Models
 
         private int lastWorkAreaHeight = (int)Settings.WorkArea.Height;
 
+        private int? screenWidth = null;
+
+        private int? screenHeight = null;
+
+        private bool isModified = false;
+
         public bool IsScaled { get; private set; }
 
         // RemoveZoneAt
-        //  Removes the specified index from the Zones list, and fires a property changed notification for the Zones property
+        // Removes the specified index from the Zones list, and fires a property changed notification for the Zones property
         public void RemoveZoneAt(int index)
         {
             Zones.RemoveAt(index);
@@ -66,7 +94,7 @@ namespace FancyZonesEditor.Models
         }
 
         // AddZone
-        //  Adds the specified Zone to the end of the Zones list, and fires a property changed notification for the Zones property
+        // Adds the specified Zone to the end of the Zones list, and fires a property changed notification for the Zones property
         public void AddZone(Int32Rect zone)
         {
             Zones.Add(zone);
@@ -75,12 +103,13 @@ namespace FancyZonesEditor.Models
 
         private void UpdateLayout()
         {
+            isModified = true;
             FirePropertyChanged();
         }
 
         // Clone
-        //  Implements the LayoutModel.Clone abstract method
-        //  Clones the data from this CanvasLayoutModel to a new CanvasLayoutModel
+        // Implements the LayoutModel.Clone abstract method
+        // Clones the data from this CanvasLayoutModel to a new CanvasLayoutModel
         public override LayoutModel Clone()
         {
             CanvasLayoutModel layout = new CanvasLayoutModel(Name);
@@ -125,6 +154,10 @@ namespace FancyZonesEditor.Models
                 Zones.Add(new Int32Rect(scaledX, scaledY, scaledWidth, scaledHeight));
             }
 
+            // Custom layout is scaled in order to match different screen resultion, on which is
+            // being presented right now. Create new GUID in order to distinguish these two layouts.
+            Guid = Guid.NewGuid();
+
             lastWorkAreaHeight = (int)Settings.WorkArea.Height;
             lastWorkAreaWidth = (int)Settings.WorkArea.Width;
             IsScaled = true;
@@ -146,6 +179,10 @@ namespace FancyZonesEditor.Models
             public int RefWidth { get; set; }
 
             public int RefHeight { get; set; }
+
+            public int ScreenWidth { get; set; }
+
+            public int ScreenHeight { get; set; }
 
             public Zone[] Zones { get; set; }
         }
@@ -172,6 +209,22 @@ namespace FancyZonesEditor.Models
 
                 Zones = new Zone[Zones.Count],
             };
+            if (isModified || IsScaled)
+            {
+                // Update screen resolution if layout is modified, or scaled to fit different screen.
+                var (width, height) = GetScreenResolution();
+                if (width.HasValue && height.HasValue)
+                {
+                    layoutInfo.ScreenWidth = width.Value;
+                    layoutInfo.ScreenHeight = height.Value;
+                }
+            }
+            else if (screenWidth.HasValue && screenHeight.HasValue)
+            {
+                layoutInfo.ScreenWidth = screenWidth.Value;
+                layoutInfo.ScreenHeight = screenHeight.Value;
+            }
+
             for (int i = 0; i < Zones.Count; ++i)
             {
                 Zone zone = new Zone
@@ -207,6 +260,37 @@ namespace FancyZonesEditor.Models
             {
                 ShowExceptionMessageBox(ErrorPersistingCanvasLayout, ex);
             }
+        }
+
+        private static (int? width, int? height) GetScreenResolution()
+        {
+            Window main = ((App)Application.Current).MainWindow;
+            if (main != null)
+            {
+                // TODO: This function can return screen coordinates only when main window is created (after EditorOverlay is created). It should handle other cases as well.
+                var screen = System.Windows.Forms.Screen.FromHandle(new System.Windows.Interop.WindowInteropHelper(main).Handle);
+                var rect = screen.Bounds;
+                return (rect.Width, rect.Height);
+            }
+
+            return (null, null);
+        }
+
+        private static string BuildScreenInformationString(int? width, int? height)
+        {
+            if (width.HasValue && height.HasValue)
+            {
+                return "Designed for " + width.Value + " x " + height.Value;
+            }
+            else
+            {
+                return string.Empty;
+            }
+        }
+
+        protected override string GetScreenInfo()
+        {
+            return BuildScreenInformationString(screenWidth, screenHeight);
         }
     }
 }

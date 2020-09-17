@@ -244,5 +244,10 @@ namespace FancyZonesEditor.Models
                 ShowExceptionMessageBox(ErrorPersistingGridLayout, ex);
             }
         }
+
+        protected override string GetScreenInfo()
+        {
+            return string.Empty;
+        }
     }
 }

@@ -34,8 +34,11 @@ namespace FancyZonesDataTypes
 
     struct CanvasLayoutInfo
     {
-        int lastWorkAreaWidth;
-        int lastWorkAreaHeight;
+        int workAreaWidth;
+        int workAreaHeight;
+
+        std::optional<int> screenWidth;
+        std::optional<int> screenHeight;
 
         struct Rect
         {

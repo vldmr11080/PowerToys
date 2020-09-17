@@ -36,6 +36,8 @@ namespace NonLocalizable
     const wchar_t RefWidthStr[] = L"ref-width";
     const wchar_t RowsPercentageStr[] = L"rows-percentage";
     const wchar_t RowsStr[] = L"rows";
+    const wchar_t ScreenHeightStr[] = L"screen-height";
+    const wchar_t ScreenWidthStr[] = L"screen-width";
     const wchar_t TypeStr[] = L"type";
     const wchar_t UuidStr[] = L"uuid";
     const wchar_t WidthStr[] = L"width";
@@ -109,8 +111,14 @@ namespace JSONHelpers
     json::JsonObject CanvasLayoutInfoJSON::ToJson(const FancyZonesDataTypes::CanvasLayoutInfo& canvasInfo)
     {
         json::JsonObject infoJson{};
-        infoJson.SetNamedValue(NonLocalizable::RefWidthStr, json::value(canvasInfo.lastWorkAreaWidth));
-        infoJson.SetNamedValue(NonLocalizable::RefHeightStr, json::value(canvasInfo.lastWorkAreaHeight));
+        infoJson.SetNamedValue(NonLocalizable::RefWidthStr, json::value(canvasInfo.workAreaWidth));
+        infoJson.SetNamedValue(NonLocalizable::RefHeightStr, json::value(canvasInfo.workAreaHeight));
+
+        if (canvasInfo.screenWidth.has_value() && canvasInfo.screenHeight.has_value())
+        {
+            infoJson.SetNamedValue(NonLocalizable::ScreenWidthStr, json::value(canvasInfo.screenWidth.value()));
+            infoJson.SetNamedValue(NonLocalizable::ScreenHeightStr, json::value(canvasInfo.screenHeight.value()));
+        }
 
         json::JsonArray zonesJson;
 
@@ -132,8 +140,15 @@ namespace JSONHelpers
         try
         {
             FancyZonesDataTypes::CanvasLayoutInfo info;
-            info.lastWorkAreaWidth = static_cast<int>(infoJson.GetNamedNumber(NonLocalizable::RefWidthStr));
-            info.lastWorkAreaHeight = static_cast<int>(infoJson.GetNamedNumber(NonLocalizable::RefHeightStr));
+            info.workAreaWidth = static_cast<int>(infoJson.GetNamedNumber(NonLocalizable::RefWidthStr));
+            info.workAreaHeight = static_cast<int>(infoJson.GetNamedNumber(NonLocalizable::RefHeightStr));
+
+            if (infoJson.HasKey(NonLocalizable::ScreenWidthStr) &&
+                infoJson.HasKey(NonLocalizable::ScreenHeightStr))
+            {
+                info.screenWidth = static_cast<int>(infoJson.GetNamedNumber(NonLocalizable::ScreenWidthStr));
+                info.screenHeight = static_cast<int>(infoJson.GetNamedNumber(NonLocalizable::ScreenHeightStr));
+            }
 
             json::JsonArray zonesJson = infoJson.GetNamedArray(NonLocalizable::ZonesStr);
             uint32_t size = zonesJson.Size();

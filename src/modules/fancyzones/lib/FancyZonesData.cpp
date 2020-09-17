@@ -554,9 +554,9 @@ void FancyZonesData::MigrateCustomZoneSetsFromRegistry()
                 // To see how custom Canvas layout was packed in registry
                 int j = 5;
                 FancyZonesDataTypes::CanvasLayoutInfo info;
-                info.lastWorkAreaWidth = data[j] * 256 + data[j + 1];
+                info.workAreaWidth = data[j] * 256 + data[j + 1];
                 j += 2;
-                info.lastWorkAreaHeight = data[j] * 256 + data[j + 1];
+                info.workAreaHeight = data[j] * 256 + data[j + 1];
                 j += 2;
 
                 int count = data[j++];
