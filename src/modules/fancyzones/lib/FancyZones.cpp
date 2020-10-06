@@ -212,6 +212,7 @@ private:
     bool ProcessDirectedSnapHotkey(HWND window, DWORD vkCode, bool cycle, winrt::com_ptr<IZoneWindow> zoneWindow) noexcept;
 
     void RegisterVirtualDesktopUpdates(std::vector<GUID>& ids) noexcept;
+    void UpdatePersistedData() noexcept;
 
     bool IsSplashScreen(HWND window);
     bool ShouldProcessNewWindow(HWND window) noexcept;
@@ -895,12 +896,7 @@ void FancyZones::OnDisplayChange(DisplayChangeType changeType) noexcept
         }
         if (changeType == DisplayChangeType::Initialization)
         {
-            std::vector<std::wstring> ids{};
-            if (VirtualDesktopUtils::GetVirtualDesktopIds(ids) && !ids.empty())
-            {
-                FancyZonesDataInstance().UpdatePrimaryDesktopData(ids[0]);
-                FancyZonesDataInstance().RemoveDeletedDesktops(ids);
-            }
+            UpdatePersistedData();
         }
     }
 
@@ -1299,10 +1295,20 @@ void FancyZones::RegisterVirtualDesktopUpdates(std::vector<GUID>& ids) noexcept
     std::unique_lock writeLock(m_lock);
 
     m_workAreaHandler.RegisterUpdates(ids);
+    UpdatePersistedData();
+}
+
+void FancyZones::UpdatePersistedData() noexcept
+{
     std::vector<std::wstring> active{};
-    if (VirtualDesktopUtils::GetVirtualDesktopIds(active))
+    if (VirtualDesktopUtils::GetVirtualDesktopIds(active) && !active.empty())
     {
-        FancyZonesDataInstance().RemoveDeletedDesktops(active);
+        auto& fancyZonesData = FancyZonesDataInstance();
+        if (fancyZonesData.PrimaryDesktopHasZeroedGUID())
+        {
+            fancyZonesData.UpdatePrimaryDesktopData(active[0]);
+        }
+        fancyZonesData.RemoveDeletedDesktops(active);
     }
 }
 

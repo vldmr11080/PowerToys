@@ -40,6 +40,16 @@ namespace
         return deviceId.substr(deviceId.rfind('_') + 1);
     }
 
+    bool HasZeroedGUID(const std::wstring& deviceId)
+    {
+        return ExtractVirtualDesktopId(deviceId) == NonLocalizable::DefaultGuid;
+    }
+
+    bool HasZeroedGUID(const std::unordered_map<std::wstring, FancyZonesDataTypes::DeviceInfoData>& deviceInfoMap)
+    {
+        return std::any_of(std::begin(deviceInfoMap), std::end(deviceInfoMap), [](auto mapEntry) { return HasZeroedGUID(mapEntry.first); });
+    }
+
     const std::wstring& GetTempDirPath()
     {
         static std::wstring tmpDirPath;
@@ -192,6 +202,8 @@ void FancyZonesData::AddDevice(const std::wstring& deviceId)
         {
             deviceInfoMap[deviceId] = DeviceInfoData{ ZoneSetData{ NonLocalizable::NullStr, ZoneSetLayoutType::Blank } };
         }
+
+        primaryDesktopHasZeroedGUID = HasZeroedGUID(deviceId);
     }
 }
 
@@ -211,6 +223,8 @@ void FancyZonesData::CloneDeviceInfo(const std::wstring& source, const std::wstr
 
     // Clone information from source device if destination device is uninitialized (Blank).
     deviceInfoMap[destination] = deviceInfoMap[source];
+
+    primaryDesktopHasZeroedGUID = HasZeroedGUID(destination);
 }
 
 void FancyZonesData::UpdatePrimaryDesktopData(const std::wstring& desktopId)
@@ -249,6 +263,8 @@ void FancyZonesData::UpdatePrimaryDesktopData(const std::wstring& desktopId)
         mapEntry.key() = replaceDesktopId(id);
         deviceInfoMap.insert(std::move(mapEntry));
     }
+
+    primaryDesktopHasZeroedGUID = false; // cleanup performed, all zeroed GUIDS are replaced
     SaveFancyZonesData();
 }
 
@@ -505,6 +521,8 @@ void FancyZonesData::ParseDeviceInfoFromTmpFile(std::wstring_view tmpFilePath)
     if (deviceInfo)
     {
         deviceInfoMap[deviceInfo->deviceId] = std::move(deviceInfo->data);
+
+        primaryDesktopHasZeroedGUID = HasZeroedGUID(deviceInfo->deviceId);
     }
 }
 
@@ -547,6 +565,8 @@ void FancyZonesData::LoadFancyZonesData()
         appZoneHistoryMap = JSONHelpers::ParseAppZoneHistory(fancyZonesDataJSON);
         deviceInfoMap = JSONHelpers::ParseDeviceInfos(fancyZonesDataJSON);
         customZoneSetsMap = JSONHelpers::ParseCustomZoneSets(fancyZonesDataJSON);
+
+        primaryDesktopHasZeroedGUID = HasZeroedGUID(deviceInfoMap);
     }
 
     DeleteFancyZonesRegistryData();

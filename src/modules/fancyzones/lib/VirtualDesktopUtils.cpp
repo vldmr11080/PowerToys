@@ -10,6 +10,20 @@ namespace NonLocalizable
     const wchar_t RegKeyVirtualDesktops[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VirtualDesktops";
 }
 
+namespace
+{
+    bool ToString(const GUID& guid, std::wstring& guidStr)
+    {
+        wil::unique_cotaskmem_string guidString;
+        if (SUCCEEDED(StringFromCLSID(guid, &guidString)))
+        {
+            guidStr = guidString.get();
+            return true;
+        }
+        return false;
+    }
+}
+
 namespace VirtualDesktopUtils
 {
     const CLSID CLSID_ImmersiveShell = { 0xC2F03A33, 0x21F5, 0x47FA, 0xB4, 0xBB, 0x15, 0x63, 0x62, 0xA2, 0xF2, 0x39 };
@@ -56,22 +70,22 @@ namespace VirtualDesktopUtils
         ProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
 
         wchar_t sessionKeyPath[256]{};
-        RETURN_IF_FAILED(
-            StringCchPrintfW(
-                sessionKeyPath,
-                ARRAYSIZE(sessionKeyPath),
-                L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SessionInfo\\%d\\VirtualDesktops",
-                sessionId));
-
-        wil::unique_hkey key{};
-        GUID value{};
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, sessionKeyPath, 0, KEY_ALL_ACCESS, &key) == ERROR_SUCCESS)
+        if(SUCCEEDED(StringCchPrintfW(
+            sessionKeyPath,
+            ARRAYSIZE(sessionKeyPath),
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SessionInfo\\%d\\VirtualDesktops",
+            sessionId)))
         {
-            DWORD size = sizeof(GUID);
-            if (RegQueryValueExW(key.get(), NonLocalizable::RegCurrentVirtualDesktop, 0, nullptr, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS)
+            wil::unique_hkey key{};
+            GUID value{};
+            if (RegOpenKeyExW(HKEY_CURRENT_USER, sessionKeyPath, 0, KEY_ALL_ACCESS, &key) == ERROR_SUCCESS)
             {
-                *desktopId = value;
-                return true;
+                DWORD size = sizeof(GUID);
+                if (RegQueryValueExW(key.get(), NonLocalizable::RegCurrentVirtualDesktop, 0, nullptr, reinterpret_cast<BYTE*>(&value), &size) == ERROR_SUCCESS)
+                {
+                    *desktopId = value;
+                    return true;
+                }
             }
         }
         return false;
@@ -86,14 +100,7 @@ namespace VirtualDesktopUtils
         {
             return true;
         }
-        // First fallback scenario is to try obtaining virtual desktop id through IVirtualDesktopManager
-        // interface. Use foreground window (the window with which the user is currently working) to determine
-        // current virtual desktop.
-        else if (GetWindowDesktopId(GetForegroundWindow(), desktopId))
-        {
-            return true;
-        }
-        // Second fallback scenario is to get array of virtual desktops stored in registry, but not kept per
+        // Fallback scenario is to get array of virtual desktops stored in registry, but not kept per
         // session. Note that we are taking first element from virtual desktop array, which is primary desktop.
         // If user has more than one virtual desktop, one of previous functions should return correct value,
         // as desktop switch occured in current session.
@@ -151,10 +158,10 @@ namespace VirtualDesktopUtils
         {
             for (auto& guid : guids)
             {
-                wil::unique_cotaskmem_string guidString;
-                if (SUCCEEDED(StringFromCLSID(guid, &guidString)))
+                std::wstring guidStr{};
+                if (ToString(guid, guidStr))
                 {
-                    ids.push_back(guidString.get());
+                    ids.push_back(guidStr);
                 }
             }
             return true;

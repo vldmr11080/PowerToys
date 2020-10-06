@@ -79,6 +79,11 @@ public:
     void LoadFancyZonesData();
     void SaveFancyZonesData() const;
 
+    bool PrimaryDesktopHasZeroedGUID() const
+    {
+        return primaryDesktopHasZeroedGUID;
+    }
+
 private:
 #if defined(UNIT_TESTS)
     friend class FancyZonesUnitTests::FancyZonesDataUnitTests;
@@ -131,6 +136,8 @@ private:
     std::wstring activeZoneSetTmpFileName;
     std::wstring appliedZoneSetTmpFileName;
     std::wstring deletedCustomZoneSetsTmpFileName;
+
+    bool primaryDesktopHasZeroedGUID{ false };
 
     mutable std::recursive_mutex dataLock;
 };
